@@ -5,3 +5,5 @@ export { indexBuffer } from './record-index.js';
 export type { RecordIndex } from './record-index.js';
 
 export { LRUCache } from './lru-cache.js';
+
+export * from './transform.js';

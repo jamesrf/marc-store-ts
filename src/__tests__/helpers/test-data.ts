@@ -1,4 +1,4 @@
-import { serializeMarcRecord, type MarcRecord } from 'marc-ts';
+import { serializeMarcBinary, type MarcRecord } from 'marc-ts';
 
 /**
  * Create a minimal valid MARC record with just control field 001.
@@ -49,7 +49,7 @@ export function createMultiRecordBuffer(count: number): Uint8Array {
     createTypicalRecord(String(i).padStart(8, '0'))
   );
 
-  const buffers = records.map(serializeMarcRecord);
+  const buffers = records.map(r => serializeMarcBinary([r]));
   const totalLength = buffers.reduce((sum, buf) => sum + buf.length, 0);
 
   const result = new Uint8Array(totalLength);
@@ -69,5 +69,5 @@ export function createMultiRecordBuffer(count: number): Uint8Array {
  * @returns Uint8Array containing serialized record
  */
 export function serializeRecord(record: MarcRecord): Uint8Array {
-  return serializeMarcRecord(record);
+  return serializeMarcBinary([record]);
 }

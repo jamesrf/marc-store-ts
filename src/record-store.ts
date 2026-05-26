@@ -1,5 +1,5 @@
 import type { MarcRecord } from 'marc-ts';
-import { parseMarcRecordStrict, serializeMarcRecord } from 'marc-ts';
+import { parseMarcBinary, serializeMarcBinary } from 'marc-ts';
 import type { RecordIndex } from './record-index.js';
 import { indexBuffer } from './record-index.js';
 import { LRUCache } from './lru-cache.js';
@@ -148,7 +148,7 @@ export class MarcFile {
       return new Uint8Array(this.rawBuffer, offset, length);
     }
     if (slot.kind === 'modified' || slot.kind === 'inserted') {
-      return serializeMarcRecord(slot.record);
+      return serializeMarcBinary([slot.record]);
     }
     throw new RangeError(`Record index ${position} is deleted`);
   }
@@ -160,7 +160,7 @@ export class MarcFile {
         const { offset, length } = this.recordIndex[slot.index];
         yield new Uint8Array(this.rawBuffer, offset, length);
       } else {
-        yield serializeMarcRecord(slot.record);
+        yield serializeMarcBinary([slot.record]);
       }
     }
   }
@@ -199,7 +199,9 @@ export class MarcFile {
     }
     let record: MarcRecord;
     try {
-      record = parseMarcRecordStrict(new Uint8Array(this.rawBuffer, offset, length));
+      const parsed = parseMarcBinary(new Uint8Array(this.rawBuffer, offset, length), { strict: true });
+      if (parsed.length === 0) throw new Error('No record returned');
+      record = parsed[0];
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       throw new Error(`Parse failed at index ${position} (offset ${offset}): ${msg}`);

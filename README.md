@@ -231,6 +231,190 @@ class LRUCache<K, V> {
 }
 ```
 
+## Transform Utilities
+
+`marc-store-ts` includes a set of bulk editing and export functions via the `transform` module. All functions operate on the store's live overlay — edits made with `setRecord` are visible to them immediately.
+
+### Bulk editing
+
+#### `applyToAll(store, fn)`
+
+Apply a transform to every record in the store. Returns the number of records processed.
+
+```typescript
+import { readFileSync } from 'fs';
+import { MarcFile, applyToAll, toMarcBinary } from 'marc-store-ts';
+import { appendField } from 'marc-ts';
+import { writeFileSync } from 'fs';
+
+const store = MarcFile.fromBuffer(readFileSync('catalog.mrc'));
+
+// Add a local note to every record
+const count = applyToAll(store, record =>
+  appendField(record, {
+    tag: '599',
+    indicator1: ' ',
+    indicator2: ' ',
+    subfields: [{ code: 'a', value: 'Migrated 2024' }],
+  })
+);
+
+console.log(`Updated ${count} records`);
+writeFileSync('catalog-updated.mrc', toMarcBinary(store));
+```
+
+#### `applyToMatching(store, predicate, fn)`
+
+Apply a transform only to records matching a predicate. Returns the number of records changed.
+
+```typescript
+import { applyToMatching } from 'marc-store-ts';
+import { getField, isDataField, removeFields, appendField } from 'marc-ts';
+
+// Replace a publisher name in records that have a 264 field
+applyToMatching(
+  store,
+  record => {
+    const f = getField(record, '264');
+    return f !== undefined && isDataField(f);
+  },
+  record => {
+    const updated = removeFields(record, '264');
+    return appendField(updated, {
+      tag: '264',
+      indicator1: ' ',
+      indicator2: '1',
+      subfields: [
+        { code: 'a', value: 'New York' },
+        { code: 'b', value: 'Acme Publishing' },
+        { code: 'c', value: '2024' },
+      ],
+    });
+  }
+);
+```
+
+#### `deleteMatching(store, predicate)`
+
+Delete every record for which the predicate returns `true`. Returns the number of records deleted.
+
+```typescript
+import { deleteMatching, toMarcBinary } from 'marc-store-ts';
+import { getField, isDataField } from 'marc-ts';
+import { writeFileSync } from 'fs';
+
+// Delete all records whose record type (leader byte 6) is 'u' (unknown)
+const deleted = deleteMatching(store, record => record.leader[6] === 'u');
+console.log(`Deleted ${deleted} records; ${store.totalRecords} remaining`);
+
+writeFileSync('output.mrc', toMarcBinary(store));
+```
+
+#### `keepMatching(store, predicate)`
+
+Delete every record for which the predicate returns `false`, keeping only those where it returns `true`. The inverse of `deleteMatching`. Returns the number of records deleted.
+
+```typescript
+import { keepMatching, toMarcBinary } from 'marc-store-ts';
+import { subjects } from 'marc-ts';
+import { writeFileSync } from 'fs';
+
+// Keep only records that have at least one subject heading
+const deleted = keepMatching(store, record => subjects(record).length > 0);
+console.log(`Removed ${deleted} records; ${store.totalRecords} remaining`);
+
+writeFileSync('filtered.mrc', toMarcBinary(store));
+```
+
+### Exporting to files
+
+All export functions return a value — you write it to disk yourself.
+
+#### `toMarcBinary(store)` — MARC21 binary (`.mrc`)
+
+```typescript
+import { writeFileSync } from 'fs';
+import { toMarcBinary } from 'marc-store-ts';
+
+writeFileSync('output.mrc', toMarcBinary(store));
+```
+
+Unmodified records are zero-copied from the original buffer, so this is fast even for large files.
+
+#### `toMarcXml(store, options?)` — MARCXML (`.xml`)
+
+```typescript
+import { writeFileSync } from 'fs';
+import { toMarcXml } from 'marc-store-ts';
+
+writeFileSync('output.xml', toMarcXml(store));
+
+// Custom encoding declaration
+writeFileSync('output.xml', toMarcXml(store, { encoding: 'UTF-8' }));
+```
+
+Output follows the [Library of Congress MARCXML schema](https://www.loc.gov/standards/marcxml/). Special characters in field data (`&`, `<`, `>`, `"`, `'`) are automatically escaped.
+
+#### `toJson(store, options?)` — JSON (`.json`)
+
+```typescript
+import { writeFileSync } from 'fs';
+import { toJson } from 'marc-store-ts';
+
+// Compact
+writeFileSync('output.json', toJson(store));
+
+// Pretty-printed
+writeFileSync('output.json', toJson(store, { pretty: true }));
+```
+
+Each record is serialized as:
+```json
+{
+  "leader": "00000nam  2200000   4500",
+  "fields": [
+    { "tag": "001", "data": "ocm12345678" },
+    {
+      "tag": "245",
+      "indicator1": "1",
+      "indicator2": "0",
+      "subfields": [{ "code": "a", "value": "The Catcher in the Rye" }]
+    }
+  ]
+}
+```
+
+### Putting it together
+
+A complete workflow — load, filter, edit, and export to multiple formats:
+
+```typescript
+import { readFileSync, writeFileSync } from 'fs';
+import { MarcFile, applyToAll, keepMatching, toMarcBinary, toMarcXml, toJson } from 'marc-store-ts';
+import { appendField, subjects } from 'marc-ts';
+
+const store = MarcFile.fromBuffer(readFileSync('catalog.mrc'));
+
+// 1. Keep only records with subject headings
+keepMatching(store, record => subjects(record).length > 0);
+console.log(`${store.totalRecords} records after filter`);
+
+// 2. Add a processing note to every remaining record
+applyToAll(store, record =>
+  appendField(record, {
+    tag: '583',
+    indicator1: ' ',
+    indicator2: ' ',
+    subfields: [{ code: 'a', value: 'processed' }, { code: 'c', value: '20240101' }],
+  })
+);
+
+// 3. Write all three output formats
+writeFileSync('output.mrc', toMarcBinary(store));
+writeFileSync('output.xml', toMarcXml(store));
+writeFileSync('output.json', toJson(store, { pretty: true }));
+```
+
 ## Usage Examples
 
 See the [`examples/`](./examples) directory for detailed examples:
@@ -243,46 +427,39 @@ See the [`examples/`](./examples) directory for detailed examples:
 
 ### Common Patterns
 
-#### Editing Records
+#### Editing a single record
 
 ```typescript
 import { appendField } from 'marc-ts';
 
-// Get record
 const record = store.getRecord(5);
-
-// Modify it
 const modified = appendField(record, {
   tag: '500',
   indicator1: ' ',
   indicator2: ' ',
   subfields: [{ code: 'a', value: 'Additional note' }]
 });
-
-// Save changes
 store.setRecord(5, modified);
 ```
 
-#### Batch Processing
+#### Safe batch processing
 
 ```typescript
-// Process all records
 for (let i = 0; i < store.totalRecords; i++) {
   const result = store.tryGetRecord(i);
   if (result.ok) {
-    // Process result.record
+    // process result.record
   } else {
     console.error(`Record ${i}: ${result.error}`);
   }
 }
 ```
 
-#### Checking Modifications
+#### Checking modifications
 
 ```typescript
-console.log(`Modified ${store.modifiedCount} records`);
+console.log(`Modified ${store.modifiedCount} of ${store.totalRecords} records`);
 
-// Check specific records
 for (let i = 0; i < store.totalRecords; i++) {
   if (store.isModified(i)) {
     console.log(`Record ${i} has been edited`);
