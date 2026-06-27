@@ -17,6 +17,7 @@ export type RecordSlot = OriginalSlot | ModifiedSlot | DeletedSlot | InsertedSlo
 
 export class MarcFile {
   private readonly rawBuffer: ArrayBuffer;
+  private readonly rawBufferOffset: number;
   private readonly recordIndex: RecordIndex[];
   private readonly cache: LRUCache<number, MarcRecord>;
   private readonly _slots: RecordSlot[];
@@ -26,7 +27,13 @@ export class MarcFile {
     recordIndex: RecordIndex[],
     cacheCapacity = 200
   ) {
-    this.rawBuffer = rawBuffer instanceof Uint8Array ? rawBuffer.buffer as ArrayBuffer : rawBuffer;
+    if (rawBuffer instanceof Uint8Array) {
+      this.rawBuffer = rawBuffer.buffer as ArrayBuffer;
+      this.rawBufferOffset = rawBuffer.byteOffset;
+    } else {
+      this.rawBuffer = rawBuffer;
+      this.rawBufferOffset = 0;
+    }
     this.recordIndex = recordIndex;
     this.cache = new LRUCache(cacheCapacity);
     this._slots = recordIndex.map((_, i): OriginalSlot => ({ kind: 'original', index: i }));
@@ -145,7 +152,7 @@ export class MarcFile {
     }
     if (slot.kind === 'original') {
       const { offset, length } = this.recordIndex[slot.index];
-      return new Uint8Array(this.rawBuffer, offset, length);
+      return new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length);
     }
     if (slot.kind === 'modified' || slot.kind === 'inserted') {
       return serializeMarcBinary([slot.record]);
@@ -158,7 +165,7 @@ export class MarcFile {
       if (slot.kind === 'deleted') continue;
       if (slot.kind === 'original') {
         const { offset, length } = this.recordIndex[slot.index];
-        yield new Uint8Array(this.rawBuffer, offset, length);
+        yield new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length);
       } else {
         yield serializeMarcBinary([slot.record]);
       }
@@ -199,7 +206,7 @@ export class MarcFile {
     }
     let record: MarcRecord;
     try {
-      const parsed = parseMarcBinary(new Uint8Array(this.rawBuffer, offset, length), { strict: true });
+      const parsed = parseMarcBinary(new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length), { strict: true });
       if (parsed.length === 0) throw new Error('No record returned');
       record = parsed[0];
     } catch (e) {

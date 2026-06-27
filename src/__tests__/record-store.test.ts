@@ -58,6 +58,29 @@ describe('MarcFile', () => {
       const store = MarcFile.fromBuffer(buffer, 50);
       expect(store.totalRecords).toBe(5);
     });
+
+    it('handles Uint8Array subarray views with non-zero byteOffset', () => {
+      const marcData = createMultiRecordBuffer(3);
+      const padding = 256;
+      const wrapper = new Uint8Array(padding + marcData.length + padding);
+      wrapper.set(marcData, padding);
+      const view = wrapper.subarray(padding, padding + marcData.length);
+
+      const storeFromView = MarcFile.fromBuffer(view);
+      const storeFromFull = MarcFile.fromBuffer(marcData);
+
+      expect(storeFromView.totalRecords).toBe(storeFromFull.totalRecords);
+
+      for (let i = 0; i < storeFromFull.totalRecords; i++) {
+        const recordFromView = storeFromView.getRecord(i);
+        const recordFromFull = storeFromFull.getRecord(i);
+        expect(recordFromView.leader).toBe(recordFromFull.leader);
+
+        const serializedFromView = storeFromView.getSerializedRecord(i);
+        const serializedFromFull = storeFromFull.getSerializedRecord(i);
+        expect(Array.from(serializedFromView)).toEqual(Array.from(serializedFromFull));
+      }
+    });
   });
 
   describe('getRecord', () => {
