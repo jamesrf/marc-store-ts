@@ -393,6 +393,65 @@ describe('MarcFile', () => {
     });
   });
 
+  describe('record immutability', () => {
+    it('freezes records parsed from buffer', () => {
+      const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
+      const record = store.getRecord(0);
+      expect(Object.isFrozen(record)).toBe(true);
+      expect(Object.isFrozen(record.fields)).toBe(true);
+      for (const field of record.fields) {
+        expect(Object.isFrozen(field)).toBe(true);
+      }
+    });
+
+    it('throws TypeError when mutating a returned original record', () => {
+      const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
+      const record = store.getRecord(0);
+      expect(() => {
+        (record as any).leader = 'changed';
+      }).toThrow(TypeError);
+      expect(() => {
+        (record.fields as any).push({ tag: '999', data: 'bad' });
+      }).toThrow(TypeError);
+    });
+
+    it('throws TypeError when mutating a returned modified record', () => {
+      const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
+      const original = store.getRecord(0);
+      const modified = appendField(original, {
+        tag: '500', indicator1: ' ', indicator2: ' ',
+        subfields: [{ code: 'a', value: 'Test' }],
+      });
+      store.setRecord(0, modified);
+      const retrieved = store.getRecord(0);
+      expect(Object.isFrozen(retrieved)).toBe(true);
+      expect(() => {
+        (retrieved as any).leader = 'changed';
+      }).toThrow(TypeError);
+    });
+
+    it('freezes inserted records', () => {
+      const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
+      const newRecord = createTypicalRecord('inserted');
+      store.insertRecord(newRecord, 1);
+      const retrieved = store.getRecord(2);
+      expect(Object.isFrozen(retrieved)).toBe(true);
+      expect(Object.isFrozen(retrieved.fields)).toBe(true);
+    });
+
+    it('allows setRecord with a new record after freeze', () => {
+      const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
+      const record = store.getRecord(0);
+      const updated = appendField(record, {
+        tag: '500', indicator1: ' ', indicator2: ' ',
+        subfields: [{ code: 'a', value: 'Added via setRecord' }],
+      });
+      store.setRecord(0, updated);
+      expect(store.getRecord(0).fields.length).toBe(record.fields.length + 1);
+      expect(store.isModified(0)).toBe(true);
+    });
+  });
+
   describe('cache behavior', () => {
     it('caches parsed records up to capacity', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(5), 2);

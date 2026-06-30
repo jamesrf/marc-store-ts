@@ -1,6 +1,6 @@
 import { isControlField, isDataField } from 'marc-ts';
 import type { MarcRecord } from 'marc-ts';
-import { MarcFile } from './record-store.js';
+import type { ReadableStore, EditableStore } from './types.js';
 
 /**
  * Apply a transform function to every record in the store.
@@ -10,7 +10,7 @@ import { MarcFile } from './record-store.js';
  * @returns Number of records processed.
  */
 export function applyToAll(
-  store: MarcFile,
+  store: EditableStore,
   fn: (record: MarcRecord) => MarcRecord,
 ): number {
   const entries = Array.from(store.iterateRecords());
@@ -27,7 +27,7 @@ export function applyToAll(
  * @returns Number of records that matched and were written back.
  */
 export function applyToMatching(
-  store: MarcFile,
+  store: EditableStore,
   predicate: (record: MarcRecord) => boolean,
   fn: (record: MarcRecord) => MarcRecord,
 ): number {
@@ -48,7 +48,7 @@ export function applyToMatching(
  * @returns Number of records deleted.
  */
 export function deleteMatching(
-  store: MarcFile,
+  store: EditableStore,
   predicate: (record: MarcRecord) => boolean,
 ): number {
   const toDelete: number[] = [];
@@ -72,7 +72,7 @@ export function deleteMatching(
  * @returns Number of records deleted.
  */
 export function keepMatching(
-  store: MarcFile,
+  store: EditableStore,
   predicate: (record: MarcRecord) => boolean,
 ): number {
   return deleteMatching(store, record => !predicate(record));
@@ -82,7 +82,7 @@ export function keepMatching(
  * Serialize all records in the store to a single MARC21 binary buffer.
  * Unmodified records are zero-copied from the original buffer.
  */
-export function toMarcBinary(store: MarcFile): Uint8Array {
+export function toMarcBinary(store: ReadableStore): Uint8Array {
   const chunks: Uint8Array[] = [];
   let total = 0;
   for (const chunk of store.iterateSerializedRecords()) {
@@ -118,7 +118,7 @@ export interface ToMarcXmlOptions {
  * Follows the Library of Congress MARCXML schema.
  * Special characters in field data are XML-escaped.
  */
-export function toMarcXml(store: MarcFile, options?: ToMarcXmlOptions): string {
+export function toMarcXml(store: ReadableStore, options?: ToMarcXmlOptions): string {
   const { encoding = 'UTF-8' } = options ?? {};
   const lines: string[] = [
     `<?xml version="1.0" encoding="${encoding}"?>`,
@@ -157,7 +157,7 @@ export interface ToJsonOptions {
  * Each record is represented as `{ leader, fields }` where each field is
  * either `{ tag, data }` (control) or `{ tag, indicator1, indicator2, subfields }` (data).
  */
-export function toJson(store: MarcFile, options?: ToJsonOptions): string {
+export function toJson(store: ReadableStore, options?: ToJsonOptions): string {
   const { pretty = false } = options ?? {};
   const records = Array.from(store.iterateRecords()).map(({ record }) => ({
     leader: record.leader,
