@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { RecordStore, indexBuffer } from '../index.js';
 import { createMultiRecordBuffer } from './helpers/test-data.js';
-import { appendField, isDataField } from 'marc-ts';
+import { appendField, isDataField, type MarcRecord } from 'marc-ts';
 
 describe('Integration Tests', () => {
   it('loads multi-record file and accesses random records', () => {
@@ -239,13 +239,13 @@ describe('Integration Tests', () => {
     const store = new RecordStore(buffer.buffer, index, 10); // Cache capacity 10
 
     // Access records 0-9 (all should fit in cache)
-    const firstPass: any[] = [];
+    const firstPass: MarcRecord[] = [];
     for (let i = 0; i < 10; i++) {
       firstPass.push(store.getRecord(i));
     }
 
     // Access same records again (should be cache hits)
-    const secondPass: any[] = [];
+    const secondPass: MarcRecord[] = [];
     for (let i = 0; i < 10; i++) {
       secondPass.push(store.getRecord(i));
     }

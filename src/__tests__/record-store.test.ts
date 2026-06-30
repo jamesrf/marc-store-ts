@@ -408,10 +408,10 @@ describe('MarcFile', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       const record = store.getRecord(0);
       expect(() => {
-        (record as any).leader = 'changed';
+        (record as Record<string, unknown>).leader = 'changed';
       }).toThrow(TypeError);
       expect(() => {
-        (record.fields as any).push({ tag: '999', data: 'bad' });
+        (record.fields as unknown as { push: (v: unknown) => void }).push({ tag: '999', data: 'bad' });
       }).toThrow(TypeError);
     });
 
@@ -426,7 +426,7 @@ describe('MarcFile', () => {
       const retrieved = store.getRecord(0);
       expect(Object.isFrozen(retrieved)).toBe(true);
       expect(() => {
-        (retrieved as any).leader = 'changed';
+        (retrieved as Record<string, unknown>).leader = 'changed';
       }).toThrow(TypeError);
     });
 
