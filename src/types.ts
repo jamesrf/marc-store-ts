@@ -1,12 +1,10 @@
 import type { MarcRecord } from 'marc-ts';
 
-export type RecordResult =
-  | { ok: true; record: MarcRecord }
-  | { ok: false; error: string };
+export type RecordResult = { ok: true; record: MarcRecord } | { ok: false; error: string };
 
 type OriginalSlot = { kind: 'original'; index: number };
 type ModifiedSlot = { kind: 'modified'; index: number; record: MarcRecord };
-type DeletedSlot  = { kind: 'deleted';  index: number };
+type DeletedSlot = { kind: 'deleted'; index: number };
 type InsertedSlot = { kind: 'inserted'; record: MarcRecord };
 
 export type RecordSlot = OriginalSlot | ModifiedSlot | DeletedSlot | InsertedSlot;

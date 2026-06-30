@@ -14,7 +14,10 @@ export class EditLayer implements EditableStore {
 
   constructor(base: MarcBase) {
     this.base = base;
-    this._slots = Array.from({ length: base.indexCount }, (_, i): RecordSlot => ({ kind: 'original', index: i }));
+    this._slots = Array.from({ length: base.indexCount }, (_, i): RecordSlot => ({
+      kind: 'original',
+      index: i,
+    }));
     this._totalRecords = base.indexCount;
     this._modifiedCount = 0;
     this._positionMap = null;

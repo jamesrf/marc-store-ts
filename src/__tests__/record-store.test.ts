@@ -106,7 +106,9 @@ describe('MarcFile', () => {
       const store = MarcFile.fromBuffer(buffer);
       const original = store.getRecord(0);
       const modified = appendField(original, {
-        tag: '500', indicator1: ' ', indicator2: ' ',
+        tag: '500',
+        indicator1: ' ',
+        indicator2: ' ',
         subfields: [{ code: 'a', value: 'Modified note' }],
       });
       store.setRecord(0, modified);
@@ -192,7 +194,9 @@ describe('MarcFile', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       const original = store.getRecord(0);
       const modified = appendField(original, {
-        tag: '500', indicator1: ' ', indicator2: ' ',
+        tag: '500',
+        indicator1: ' ',
+        indicator2: ' ',
         subfields: [{ code: 'a', value: 'Test' }],
       });
       store.setRecord(0, modified);
@@ -210,9 +214,19 @@ describe('MarcFile', () => {
     it('allows multiple modifications to same record', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       const original = store.getRecord(0);
-      const m1 = appendField(original, { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'First' }] });
+      const m1 = appendField(original, {
+        tag: '500',
+        indicator1: ' ',
+        indicator2: ' ',
+        subfields: [{ code: 'a', value: 'First' }],
+      });
       store.setRecord(0, m1);
-      const m2 = appendField(m1, { tag: '501', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'Second' }] });
+      const m2 = appendField(m1, {
+        tag: '501',
+        indicator1: ' ',
+        indicator2: ' ',
+        subfields: [{ code: 'a', value: 'Second' }],
+      });
       store.setRecord(0, m2);
       expect(store.modifiedCount).toBe(1);
       expect(store.getRecord(0).fields.length).toBe(original.fields.length + 2);
@@ -257,7 +271,7 @@ describe('MarcFile', () => {
       expect(store.totalRecords).toBe(4);
       store.deleteRecord(2); // the inserted one
       expect(store.totalRecords).toBe(3);
-      expect(store.slots.every(s => s.kind !== 'inserted')).toBe(true);
+      expect(store.slots.every((s) => s.kind !== 'inserted')).toBe(true);
     });
   });
 
@@ -301,7 +315,12 @@ describe('MarcFile', () => {
     it('removes record from overlay', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       const original = store.getRecord(0);
-      const modified = appendField(original, { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'Test' }] });
+      const modified = appendField(original, {
+        tag: '500',
+        indicator1: ' ',
+        indicator2: ' ',
+        subfields: [{ code: 'a', value: 'Test' }],
+      });
       store.setRecord(0, modified);
       expect(store.modifiedCount).toBe(1);
       store.revertRecord(0);
@@ -312,7 +331,12 @@ describe('MarcFile', () => {
     it('re-parses from buffer after revert', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       const original = store.getRecord(0);
-      const modified = appendField(original, { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'Test' }] });
+      const modified = appendField(original, {
+        tag: '500',
+        indicator1: ' ',
+        indicator2: ' ',
+        subfields: [{ code: 'a', value: 'Test' }],
+      });
       store.setRecord(0, modified);
       store.revertRecord(0);
       const retrieved = store.getRecord(0);
@@ -330,7 +354,15 @@ describe('MarcFile', () => {
     it('returns true after setRecord', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       const record = store.getRecord(0);
-      store.setRecord(0, appendField(record, { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'x' }] }));
+      store.setRecord(
+        0,
+        appendField(record, {
+          tag: '500',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [{ code: 'a', value: 'x' }],
+        })
+      );
       expect(store.isModified(0)).toBe(true);
       expect(store.isModified(1)).toBe(false);
     });
@@ -344,7 +376,15 @@ describe('MarcFile', () => {
     it('returns false after revertRecord', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       const record = store.getRecord(0);
-      store.setRecord(0, appendField(record, { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'x' }] }));
+      store.setRecord(
+        0,
+        appendField(record, {
+          tag: '500',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [{ code: 'a', value: 'x' }],
+        })
+      );
       store.revertRecord(0);
       expect(store.isModified(0)).toBe(false);
     });
@@ -355,18 +395,25 @@ describe('MarcFile', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(5));
       const chunks = Array.from(store.iterateSerializedRecords());
       expect(chunks).toHaveLength(5);
-      chunks.forEach(c => expect(c).toBeInstanceOf(Uint8Array));
+      chunks.forEach((c) => expect(c).toBeInstanceOf(Uint8Array));
     });
 
     it('serializes modified records from overlay', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       const original = store.getRecord(1);
-      const modified = appendField(original, { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'Modified' }] });
+      const modified = appendField(original, {
+        tag: '500',
+        indicator1: ' ',
+        indicator2: ' ',
+        subfields: [{ code: 'a', value: 'Modified' }],
+      });
       store.setRecord(1, modified);
       const chunks = Array.from(store.iterateSerializedRecords());
       expect(chunks).toHaveLength(3);
       const reloaded = MarcFile.fromBuffer(chunks[1]);
-      expect(reloaded.getRecord(0).fields.some(f => isDataField(f) && f.tag === '500')).toBe(true);
+      expect(reloaded.getRecord(0).fields.some((f) => isDataField(f) && f.tag === '500')).toBe(
+        true
+      );
     });
 
     it('yields buffer views for unmodified records (zero-copy)', () => {
@@ -386,7 +433,15 @@ describe('MarcFile', () => {
     it('handles all-modified file', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       for (let i = 0; i < 3; i++) {
-        store.setRecord(i, appendField(store.getRecord(i), { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: `Note ${i}` }] }));
+        store.setRecord(
+          i,
+          appendField(store.getRecord(i), {
+            tag: '500',
+            indicator1: ' ',
+            indicator2: ' ',
+            subfields: [{ code: 'a', value: `Note ${i}` }],
+          })
+        );
       }
       expect(Array.from(store.iterateSerializedRecords())).toHaveLength(3);
       expect(store.modifiedCount).toBe(3);
@@ -411,7 +466,10 @@ describe('MarcFile', () => {
         (record as Record<string, unknown>).leader = 'changed';
       }).toThrow(TypeError);
       expect(() => {
-        (record.fields as unknown as { push: (v: unknown) => void }).push({ tag: '999', data: 'bad' });
+        (record.fields as unknown as { push: (v: unknown) => void }).push({
+          tag: '999',
+          data: 'bad',
+        });
       }).toThrow(TypeError);
     });
 
@@ -419,7 +477,9 @@ describe('MarcFile', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       const original = store.getRecord(0);
       const modified = appendField(original, {
-        tag: '500', indicator1: ' ', indicator2: ' ',
+        tag: '500',
+        indicator1: ' ',
+        indicator2: ' ',
         subfields: [{ code: 'a', value: 'Test' }],
       });
       store.setRecord(0, modified);
@@ -443,7 +503,9 @@ describe('MarcFile', () => {
       const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
       const record = store.getRecord(0);
       const updated = appendField(record, {
-        tag: '500', indicator1: ' ', indicator2: ' ',
+        tag: '500',
+        indicator1: ' ',
+        indicator2: ' ',
         subfields: [{ code: 'a', value: 'Added via setRecord' }],
       });
       store.setRecord(0, updated);

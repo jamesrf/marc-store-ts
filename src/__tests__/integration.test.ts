@@ -63,18 +63,14 @@ describe('Integration Tests', () => {
 
     // Verify modification persisted
     const reloaded = newStore.getRecord(5);
-    const has500 = reloaded.fields.some(
-      (f) => isDataField(f) && f.tag === '500'
-    );
+    const has500 = reloaded.fields.some((f) => isDataField(f) && f.tag === '500');
     expect(has500).toBe(true);
 
     // Verify other records unchanged
     for (let i = 0; i < 10; i++) {
       if (i === 5) continue; // Skip modified record
       const record = newStore.getRecord(i);
-      const has500Other = record.fields.some(
-        (f) => isDataField(f) && f.tag === '500'
-      );
+      const has500Other = record.fields.some((f) => isDataField(f) && f.tag === '500');
       expect(has500Other).toBe(false);
     }
   });
@@ -172,9 +168,7 @@ describe('Integration Tests', () => {
 
     for (let i = 0; i < 5; i++) {
       const record = newStore.getRecord(i);
-      const has500 = record.fields.some(
-        (f) => isDataField(f) && f.tag === '500'
-      );
+      const has500 = record.fields.some((f) => isDataField(f) && f.tag === '500');
       expect(has500).toBe(true);
     }
   });
@@ -220,17 +214,11 @@ describe('Integration Tests', () => {
     const newStore = new RecordStore(serialized.buffer, newIndex);
 
     // Record 2 and 7 should have 500 field
-    expect(
-      newStore.getRecord(2).fields.some((f) => isDataField(f) && f.tag === '500')
-    ).toBe(true);
-    expect(
-      newStore.getRecord(7).fields.some((f) => isDataField(f) && f.tag === '500')
-    ).toBe(true);
+    expect(newStore.getRecord(2).fields.some((f) => isDataField(f) && f.tag === '500')).toBe(true);
+    expect(newStore.getRecord(7).fields.some((f) => isDataField(f) && f.tag === '500')).toBe(true);
 
     // Record 5 should NOT have 500 field (reverted)
-    expect(
-      newStore.getRecord(5).fields.some((f) => isDataField(f) && f.tag === '500')
-    ).toBe(false);
+    expect(newStore.getRecord(5).fields.some((f) => isDataField(f) && f.tag === '500')).toBe(false);
   });
 
   it('sequential access pattern (cache hit optimization)', () => {

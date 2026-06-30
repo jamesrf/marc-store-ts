@@ -1,39 +1,61 @@
 import { describe, it, expect } from 'vitest';
 import { MarcFile } from '../record-store.js';
-import { applyToAll, applyToMatching, deleteMatching, keepMatching, toMarcBinary, toMarcXml, toJson } from '../transform.js';
-import { createTypicalRecord, createMultiRecordBuffer, serializeRecord } from './helpers/test-data.js';
+import {
+  applyToAll,
+  applyToMatching,
+  deleteMatching,
+  keepMatching,
+  toMarcBinary,
+  toMarcXml,
+  toJson,
+} from '../transform.js';
+import {
+  createTypicalRecord,
+  createMultiRecordBuffer,
+  serializeRecord,
+} from './helpers/test-data.js';
 import { appendField, getField, isDataField } from 'marc-ts';
 
 describe('applyToAll', () => {
   it('applies fn to every record and returns count', () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(5));
-    const note = { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'Added' }] };
-    const count = applyToAll(store, r => appendField(r, note));
+    const note = {
+      tag: '500',
+      indicator1: ' ',
+      indicator2: ' ',
+      subfields: [{ code: 'a', value: 'Added' }],
+    };
+    const count = applyToAll(store, (r) => appendField(r, note));
     expect(count).toBe(5);
     expect(store.modifiedCount).toBe(5);
     for (let i = 0; i < 5; i++) {
-      expect(store.getRecord(i).fields.some(f => isDataField(f) && f.tag === '500')).toBe(true);
+      expect(store.getRecord(i).fields.some((f) => isDataField(f) && f.tag === '500')).toBe(true);
     }
   });
 
   it('returns 0 for empty store', () => {
     const store = MarcFile.fromBuffer(new Uint8Array(0));
-    expect(applyToAll(store, r => r)).toBe(0);
+    expect(applyToAll(store, (r) => r)).toBe(0);
   });
 });
 
 describe('applyToMatching', () => {
   it('applies fn only to matching records', () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(5));
-    const note = { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'Matched' }] };
+    const note = {
+      tag: '500',
+      indicator1: ' ',
+      indicator2: ' ',
+      subfields: [{ code: 'a', value: 'Matched' }],
+    };
     // Match records whose 001 field data ends in an even digit
     const count = applyToMatching(
       store,
-      r => {
+      (r) => {
         const f = getField(r, '001');
         return f !== undefined && !isDataField(f) && Number(f.data) % 2 === 0;
       },
-      r => appendField(r, note),
+      (r) => appendField(r, note)
     );
     // Records 0, 2, 4 match (ids 00000000, 00000002, 00000004)
     expect(count).toBe(3);
@@ -42,14 +64,22 @@ describe('applyToMatching', () => {
 
   it('returns 0 and leaves store unchanged when no records match', () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(4));
-    const count = applyToMatching(store, () => false, r => r);
+    const count = applyToMatching(
+      store,
+      () => false,
+      (r) => r
+    );
     expect(count).toBe(0);
     expect(store.modifiedCount).toBe(0);
   });
 
   it('behaves like applyToAll when predicate always returns true', () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
-    const count = applyToMatching(store, () => true, r => r);
+    const count = applyToMatching(
+      store,
+      () => true,
+      (r) => r
+    );
     expect(count).toBe(3);
   });
 });
@@ -58,7 +88,7 @@ describe('deleteMatching', () => {
   it('deletes records matching the predicate', () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(5));
     // Delete records with 001 value >= 3 (ids 00000003, 00000004)
-    const deleted = deleteMatching(store, r => {
+    const deleted = deleteMatching(store, (r) => {
       const f = getField(r, '001');
       return f !== undefined && !isDataField(f) && Number(f.data) >= 3;
     });
@@ -83,7 +113,7 @@ describe('deleteMatching', () => {
   it('leaves correct records after non-contiguous deletions', () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(5));
     // Delete odd-id records (00000001, 00000003)
-    deleteMatching(store, r => {
+    deleteMatching(store, (r) => {
       const f = getField(r, '001');
       return f !== undefined && !isDataField(f) && Number(f.data) % 2 !== 0;
     });
@@ -102,7 +132,7 @@ describe('keepMatching', () => {
   it('keeps only records matching the predicate', () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(5));
     // Keep only records with 001 value < 3
-    const deleted = keepMatching(store, r => {
+    const deleted = keepMatching(store, (r) => {
       const f = getField(r, '001');
       return f !== undefined && !isDataField(f) && Number(f.data) < 3;
     });
@@ -142,10 +172,15 @@ describe('toMarcBinary', () => {
 
   it('preserves overlay modifications in output', () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(2));
-    const note = { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'Preserved' }] };
+    const note = {
+      tag: '500',
+      indicator1: ' ',
+      indicator2: ' ',
+      subfields: [{ code: 'a', value: 'Preserved' }],
+    };
     store.setRecord(0, appendField(store.getRecord(0), note));
     const reloaded = MarcFile.fromBuffer(toMarcBinary(store));
-    expect(reloaded.getRecord(0).fields.some(f => isDataField(f) && f.tag === '500')).toBe(true);
+    expect(reloaded.getRecord(0).fields.some((f) => isDataField(f) && f.tag === '500')).toBe(true);
   });
 });
 
@@ -209,7 +244,7 @@ describe('toJson', () => {
   it('serializes control fields as { tag, data }', () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(1));
     const parsed = JSON.parse(toJson(store)) as Array<{ fields: Array<Record<string, unknown>> }>;
-    const controlField = parsed[0].fields.find(f => f['tag'] === '001');
+    const controlField = parsed[0].fields.find((f) => f['tag'] === '001');
     expect(controlField).toBeDefined();
     expect(typeof controlField!['data']).toBe('string');
     expect(controlField!['subfields']).toBeUndefined();
@@ -218,7 +253,7 @@ describe('toJson', () => {
   it('serializes data fields as { tag, indicator1, indicator2, subfields }', () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(1));
     const parsed = JSON.parse(toJson(store)) as Array<{ fields: Array<Record<string, unknown>> }>;
-    const dataField = parsed[0].fields.find(f => f['tag'] === '245');
+    const dataField = parsed[0].fields.find((f) => f['tag'] === '245');
     expect(dataField).toBeDefined();
     expect(typeof dataField!['indicator1']).toBe('string');
     expect(typeof dataField!['indicator2']).toBe('string');

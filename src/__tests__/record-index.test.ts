@@ -57,9 +57,7 @@ describe('indexBuffer', () => {
     const index = indexBuffer(truncatedBuffer);
 
     expect(index).toHaveLength(0); // No complete records
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Truncated length field')
-    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Truncated length field'));
 
     consoleWarnSpy.mockRestore();
   });
@@ -104,9 +102,7 @@ describe('indexBuffer', () => {
     // Should only index the first record
     expect(index).toHaveLength(1);
     expect(index[0].length).toBe(buffer1.length);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('would overflow buffer')
-    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('would overflow buffer'));
 
     consoleWarnSpy.mockRestore();
   });
@@ -138,9 +134,7 @@ describe('indexBuffer', () => {
     const index = indexBuffer(buffer);
 
     expect(index).toHaveLength(0);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('< 24 bytes')
-    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('< 24 bytes'));
 
     consoleWarnSpy.mockRestore();
   });

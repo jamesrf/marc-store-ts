@@ -9,10 +9,7 @@ import type { ReadableStore, EditableStore } from './types.js';
  *
  * @returns Number of records processed.
  */
-export function applyToAll(
-  store: EditableStore,
-  fn: (record: MarcRecord) => MarcRecord,
-): number {
+export function applyToAll(store: EditableStore, fn: (record: MarcRecord) => MarcRecord): number {
   let count = 0;
   for (const { index, record } of store.iterateRecords()) {
     store.setRecord(index, fn(record));
@@ -30,7 +27,7 @@ export function applyToAll(
 export function applyToMatching(
   store: EditableStore,
   predicate: (record: MarcRecord) => boolean,
-  fn: (record: MarcRecord) => MarcRecord,
+  fn: (record: MarcRecord) => MarcRecord
 ): number {
   let count = 0;
   for (const { index, record } of store.iterateRecords()) {
@@ -49,7 +46,7 @@ export function applyToMatching(
  */
 export function deleteMatching(
   store: EditableStore,
-  predicate: (record: MarcRecord) => boolean,
+  predicate: (record: MarcRecord) => boolean
 ): number {
   const toDelete: number[] = [];
   for (const { index, record } of store.iterateRecords()) {
@@ -73,9 +70,9 @@ export function deleteMatching(
  */
 export function keepMatching(
   store: EditableStore,
-  predicate: (record: MarcRecord) => boolean,
+  predicate: (record: MarcRecord) => boolean
 ): number {
-  return deleteMatching(store, record => !predicate(record));
+  return deleteMatching(store, (record) => !predicate(record));
 }
 
 /**
@@ -99,14 +96,16 @@ export function toMarcBinary(store: ReadableStore): Uint8Array {
 }
 
 function escapeXml(s: string): string {
-  return s
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '�')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+  return (
+    s
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '�')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
+  );
 }
 
 export interface ToMarcXmlOptions {
@@ -133,7 +132,7 @@ export function toMarcXml(store: ReadableStore, options?: ToMarcXmlOptions): str
         lines.push(`    <controlfield tag="${field.tag}">${escapeXml(field.data)}</controlfield>`);
       } else if (isDataField(field)) {
         lines.push(
-          `    <datafield tag="${field.tag}" ind1="${field.indicator1}" ind2="${field.indicator2}">`,
+          `    <datafield tag="${field.tag}" ind1="${field.indicator1}" ind2="${field.indicator2}">`
         );
         for (const sub of field.subfields) {
           lines.push(`      <subfield code="${sub.code}">${escapeXml(sub.value)}</subfield>`);
@@ -163,7 +162,7 @@ export function toJson(store: ReadableStore, options?: ToJsonOptions): string {
   for (const { record } of store.iterateRecords()) {
     records.push({
       leader: record.leader,
-      fields: record.fields.map(field => {
+      fields: record.fields.map((field) => {
         if (isControlField(field)) {
           return { tag: field.tag, data: field.data };
         }
@@ -171,7 +170,7 @@ export function toJson(store: ReadableStore, options?: ToJsonOptions): string {
           tag: field.tag,
           indicator1: field.indicator1,
           indicator2: field.indicator2,
-          subfields: field.subfields.map(s => ({ code: s.code, value: s.value })),
+          subfields: field.subfields.map((s) => ({ code: s.code, value: s.value })),
         };
       }),
     });

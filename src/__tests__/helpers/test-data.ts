@@ -49,7 +49,7 @@ export function createMultiRecordBuffer(count: number): Uint8Array {
     createTypicalRecord(String(i).padStart(8, '0'))
   );
 
-  const buffers = records.map(r => serializeMarcBinary([r]));
+  const buffers = records.map((r) => serializeMarcBinary([r]));
   const totalLength = buffers.reduce((sum, buf) => sum + buf.length, 0);
 
   const result = new Uint8Array(totalLength);

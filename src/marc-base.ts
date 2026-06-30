@@ -68,7 +68,10 @@ export class MarcBase implements ReadableStore {
     }
     let record: MarcRecord;
     try {
-      const parsed = parseMarcBinary(new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length), { strict: true });
+      const parsed = parseMarcBinary(
+        new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length),
+        { strict: true }
+      );
       if (parsed.length === 0) throw new Error('No record returned');
       record = deepFreezeRecord(parsed[0]);
     } catch (e) {
