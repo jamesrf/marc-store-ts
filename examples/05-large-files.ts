@@ -10,13 +10,13 @@
  */
 
 import { readFileSync, createWriteStream } from 'fs';
-import { indexBuffer, RecordStore } from 'marc-store-ts';
+import { indexBuffer, MarcFile } from 'marc-store-ts';
 
 // Load and index MARC file
 const filePath = process.argv[2] || 'sample-data.mrc';
 console.log(`Loading large MARC file: ${filePath}`);
 
-const buffer = readFileSync(filePath).buffer;
+const buffer = readFileSync(filePath);
 const fileSizeMB = (buffer.byteLength / 1024 / 1024).toFixed(2);
 console.log(`File size: ${fileSizeMB} MB`);
 
@@ -35,7 +35,7 @@ console.log('\n--- Strategy 1: Sequential Access (Small Cache) ---');
 console.log('Use case: Processing records in order (e.g., batch export)');
 console.log('Optimal cache size: 50-100 records');
 
-const sequentialStore = new RecordStore(buffer, recordIndex, 50);
+const sequentialStore = new MarcFile(buffer, recordIndex, 50);
 console.log(`Created store with cache capacity: 50`);
 
 // Simulate sequential access
@@ -65,7 +65,7 @@ console.log('\n--- Strategy 2: Random Access (Large Cache) ---');
 console.log('Use case: User browsing, search results, non-sequential access');
 console.log('Optimal cache size: 500-1000 records');
 
-const randomStore = new RecordStore(buffer, recordIndex, 500);
+const randomStore = new MarcFile(buffer, recordIndex, 500);
 console.log(`Created store with cache capacity: 500`);
 
 // Simulate random access pattern
@@ -102,7 +102,7 @@ console.log(`Cache efficiency: ${((randomHits - accessedIndices.size) / randomHi
 console.log('\n--- Strategy 3: Memory-Efficient Editing ---');
 console.log('Use case: Modifying a subset of records in a large file');
 
-const editStore = new RecordStore(buffer, recordIndex, 200); // Default cache
+const editStore = new MarcFile(buffer, recordIndex, 200); // Default cache
 console.log(`Total records: ${editStore.totalRecords}`);
 
 // Modify a small percentage (e.g., 1%)
@@ -114,7 +114,7 @@ console.log(`Modifying ${modifyCount} records (1% of file)...`);
 console.log(`\nMemory characteristics:`);
 console.log(`  Base index: ~${(recordIndex.length * 16 / 1024).toFixed(2)} KB`);
 console.log(`  Cache (200 records): ~${(200 * 2000 / 1024).toFixed(2)} KB (estimated)`);
-console.log(`  Overlay (${modifyCount} modified): ~${(modifyCount * 2000 / 1024).toFixed(2)} KB (estimated)`);
+console.log(`  Edit layer (${modifyCount} modified): ~${(modifyCount * 2000 / 1024).toFixed(2)} KB (estimated)`);
 console.log(`  Original buffer: Not duplicated (immutable)`);
 
 // Strategy 4: Streaming serialization
@@ -157,9 +157,9 @@ console.log('   - Formula: cache_size = working_set_size * 1.5');
 
 console.log('\n2. Memory Management:');
 console.log('   - Original buffer is immutable (no duplication)');
-console.log('   - Only modified records are stored in overlay');
+console.log('   - Only modified/inserted records are stored in the edit layer');
 console.log('   - Cache evicts LRU records automatically');
-console.log('   - Total memory ≈ buffer + index + cache + overlay');
+console.log('   - Total memory ≈ buffer + index + cache + edits');
 
 console.log('\n3. Batch Processing:');
 console.log('   - Use tryGetRecord() to avoid exceptions');

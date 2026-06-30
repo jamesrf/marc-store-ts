@@ -9,15 +9,16 @@
  */
 
 import { readFileSync } from 'fs';
-import { indexBuffer, RecordStore } from 'marc-store-ts';
+import { indexBuffer, MarcFile } from 'marc-store-ts';
+import { isDataField } from 'marc-ts';
 
 // Load and index MARC file
 const filePath = process.argv[2] || 'sample-data.mrc';
 console.log(`Loading MARC file: ${filePath}`);
 
-const buffer = readFileSync(filePath).buffer;
+const buffer = readFileSync(filePath);
 const recordIndex = indexBuffer(buffer);
-const store = new RecordStore(buffer, recordIndex);
+const store = new MarcFile(buffer, recordIndex);
 
 console.log(`Loaded ${store.totalRecords} records\n`);
 
@@ -28,7 +29,7 @@ const result = store.tryGetRecord(0);
 if (result.ok) {
   console.log('✓ Successfully retrieved record 0');
   console.log(`  Leader: ${result.record.leader}`);
-  console.log(`  Fields: ${result.record.dataFields.length}`);
+  console.log(`  Fields: ${result.record.fields.length}`);
 } else {
   console.log('✗ Failed to retrieve record 0');
   console.log(`  Error: ${result.error}`);
@@ -66,7 +67,7 @@ for (let i = 0; i < recordsToProcess; i++) {
     successCount++;
     // Process the record here
     // Example: extract title
-    const title = result.record.dataFields.find(f => f.tag === '245');
+    const title = result.record.fields.find(f => f.tag === '245' && isDataField(f));
     if (!title) {
       // Could track records without titles if needed
     }
@@ -112,7 +113,7 @@ try {
 // Example 5: Type-safe error handling pattern
 console.log('\n--- Example 5: Type-Safe Processing Function ---');
 
-function processRecord(store: RecordStore, index: number): string {
+function processRecord(store: MarcFile, index: number): string {
   const result = store.tryGetRecord(index);
 
   if (!result.ok) {
@@ -120,11 +121,10 @@ function processRecord(store: RecordStore, index: number): string {
   }
 
   // TypeScript knows result.record exists here
-  const title = result.record.dataFields
-    .find(f => f.tag === '245')
-    ?.subfields
-    .find(s => s.code === 'a')
-    ?.value || 'No title';
+  const titleField = result.record.fields.find(f => f.tag === '245');
+  const title = (titleField && isDataField(titleField))
+    ? (titleField.subfields.find(s => s.code === 'a')?.value ?? 'No title')
+    : 'No title';
 
   return `Title: ${title}`;
 }

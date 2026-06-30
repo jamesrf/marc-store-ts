@@ -9,17 +9,17 @@
  */
 
 import { readFileSync, writeFileSync } from 'fs';
-import { indexBuffer, RecordStore } from 'marc-store-ts';
-import { appendField } from 'marc-ts';
+import { indexBuffer, MarcFile } from 'marc-store-ts';
+import { appendField, isDataField } from 'marc-ts';
 
 // Load and index MARC file
 const inputFile = process.argv[2] || 'sample-data.mrc';
 const outputFile = process.argv[3] || 'output.mrc';
 
 console.log(`Loading MARC file: ${inputFile}`);
-const buffer = readFileSync(inputFile).buffer;
+const buffer = readFileSync(inputFile);
 const recordIndex = indexBuffer(buffer);
-const store = new RecordStore(buffer, recordIndex);
+const store = new MarcFile(buffer, recordIndex);
 
 console.log(`Loaded ${store.totalRecords} records\n`);
 
@@ -29,9 +29,9 @@ console.log('--- Making Modifications ---');
 // Modify every 10th record (or first 3, whichever is less)
 const modifyCount = Math.min(3, Math.ceil(store.totalRecords / 10));
 for (let i = 0; i < modifyCount; i++) {
-  const recordIndex = i * 10;
-  if (recordIndex < store.totalRecords) {
-    const record = store.getRecord(recordIndex);
+  const recordPos = i * 10;
+  if (recordPos < store.totalRecords) {
+    const record = store.getRecord(recordPos);
 
     const modified = appendField(record, {
       tag: '500',
@@ -42,8 +42,8 @@ for (let i = 0; i < modifyCount; i++) {
       ]
     });
 
-    store.setRecord(recordIndex, modified);
-    console.log(`Modified record ${recordIndex}`);
+    store.setRecord(recordPos, modified);
+    console.log(`Modified record ${recordPos}`);
   }
 }
 
@@ -88,7 +88,7 @@ console.log(`New size: ${output.length} bytes`);
 
 // Verify the output by re-loading it
 console.log('\n--- Verification ---');
-const verifyBuffer = readFileSync(outputFile).buffer;
+const verifyBuffer = readFileSync(outputFile);
 const verifyIndex = indexBuffer(verifyBuffer);
 console.log(`Output file contains ${verifyIndex.length} records`);
 
@@ -99,15 +99,16 @@ if (verifyIndex.length === store.totalRecords) {
 }
 
 // Check that modifications are preserved
-const verifyStore = new RecordStore(verifyBuffer, verifyIndex);
+const verifyStore = new MarcFile(verifyBuffer, verifyIndex);
 for (let i = 0; i < store.totalRecords; i++) {
   if (store.isModified(i)) {
     const original = store.getRecord(i);
     const verified = verifyStore.getRecord(i);
 
     // Check if the modification is present (look for our added 500 field)
-    const has500 = verified.dataFields.some(f =>
+    const has500 = verified.fields.some(f =>
       f.tag === '500' &&
+      isDataField(f) &&
       f.subfields.some(s => s.value.includes('serialization example'))
     );
 

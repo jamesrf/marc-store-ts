@@ -33,16 +33,10 @@ yarn add marc-store-ts marc-ts
 
 ```typescript
 import { readFileSync } from 'fs';
-import { indexBuffer, RecordStore } from 'marc-store-ts';
+import { MarcFile } from 'marc-store-ts';
 
-// Load MARC file
-const buffer = readFileSync('catalog.mrc').buffer;
-
-// Index the buffer (find record boundaries)
-const index = indexBuffer(buffer);
-
-// Create store with LRU cache (capacity: 200 records)
-const store = new RecordStore(buffer, index, 200);
+// Load MARC file and create store in one step
+const store = MarcFile.fromBuffer(readFileSync('catalog.mrc'));
 
 // Access records
 const record = store.getRecord(0);
@@ -54,16 +48,16 @@ console.log(`Total records: ${store.totalRecords}`);
 The library uses a **4-layer architecture** for efficient record management:
 
 ```
-Layer 1: rawBuffer (immutable ArrayBuffer - entire MARC file)
+Layer 1: rawBuffer (immutable buffer - entire MARC file)
            ↓
 Layer 2: recordIndex (lightweight array of record positions/sizes)
            ↓
 Layer 3: cache (LRU cache of recently accessed parsed records)
            ↓
-Layer 4: overlay (sparse map of edited records - copy-on-write)
+Layer 4: edits (slot-based edit layer - copy-on-write)
 ```
 
-**Record Retrieval Priority**: overlay → cache → parse from buffer
+**Record Retrieval Priority**: edits (slots) → cache → parse from buffer
 
 This design ensures:
 - Original file data is never modified (immutable buffer)
@@ -73,31 +67,46 @@ This design ensures:
 
 ## API Documentation
 
-### RecordStore
+### MarcFile / RecordStore
 
-The main storage engine for MARC files.
+The main storage engine for MARC files. Exported as both `MarcFile` (primary name) and `RecordStore` (backward-compatibility alias).
+
+#### Static factory
+
+```typescript
+static fromBuffer(buffer: Uint8Array | ArrayBuffer, cacheCapacity = 200): MarcFile
+```
+
+Convenience factory — indexes the buffer and constructs the store in one call. Equivalent to `new MarcFile(buffer, indexBuffer(buffer), cacheCapacity)`.
+
+```typescript
+import { MarcFile } from 'marc-store-ts';
+const store = MarcFile.fromBuffer(readFileSync('catalog.mrc'));
+```
 
 #### Constructor
 
 ```typescript
 constructor(
-  rawBuffer: ArrayBuffer,
+  rawBuffer: ArrayBuffer | Uint8Array,
   recordIndex: RecordIndex[],
   cacheCapacity = 200
 )
 ```
 
 **Parameters:**
-- `rawBuffer`: The complete MARC file as an ArrayBuffer
+- `rawBuffer`: The complete MARC file as a `Uint8Array` or `ArrayBuffer`
 - `recordIndex`: Array of record positions (use `indexBuffer()` to generate)
 - `cacheCapacity`: Maximum number of records to keep in LRU cache (default: 200)
 
 #### Properties
 
 ```typescript
-totalRecords: number           // Total number of records in the file
-modifiedCount: number          // Number of edited records
-overlay: ReadonlyMap<number, MarcRecord>  // Read-only view of modified records
+totalRecords: number                       // Total number of records in the file
+modifiedCount: number                      // Number of edited records
+slots: readonly Readonly<RecordSlot>[]     // Read-only snapshot of all record slots (see RecordSlot)
+base: MarcBase                             // Advanced: underlying buffer and LRU cache layer
+edits: EditLayer                           // Advanced: copy-on-write edit layer
 ```
 
 #### Methods
@@ -132,7 +141,7 @@ type RecordResult =
 
 ##### setRecord(index: number, record: MarcRecord): void
 
-Updates a record. Changes are stored in the overlay (copy-on-write).
+Updates a record. Changes are stored in the edit layer (copy-on-write).
 
 ```typescript
 store.setRecord(0, modifiedRecord);
@@ -151,10 +160,46 @@ if (store.isModified(0)) {
 
 ##### revertRecord(index: number): void
 
-Reverts a modified record back to its original state.
+Reverts a modified or deleted record back to its original state. Has no effect on inserted records (use `deleteRecord` to remove them instead).
 
 ```typescript
 store.revertRecord(0);
+```
+
+##### deleteRecord(index: number): void
+
+Marks a record as deleted in the edit layer. Deleted records are excluded from `totalRecords` and `iterateRecords()`. Reversible via `revertRecord()`.
+
+```typescript
+store.deleteRecord(5);
+console.log(store.totalRecords); // one fewer than before
+```
+
+##### insertRecord(record: MarcRecord, afterPosition?: number): void
+
+Inserts a new record into the edit layer. If `afterPosition` is omitted, the record is appended to the end.
+
+```typescript
+store.insertRecord(newRecord);               // append
+store.insertRecord(newRecord, 3);            // insert after position 3
+```
+
+##### getSerializedRecord(index: number): Uint8Array
+
+Returns the serialized binary representation of a single record. For unmodified records this is a zero-copy view into the original buffer.
+
+```typescript
+const bytes = store.getSerializedRecord(0);
+```
+
+##### *iterateRecords(): Generator<{ index: number; record: MarcRecord }>
+
+Iterates over all active (non-deleted) records, yielding `{ index, record }` pairs where `index` is the 0-based position among active records.
+
+```typescript
+for (const { index, record } of store.iterateRecords()) {
+  console.log(index, record.leader);
+}
 ```
 
 ##### *iterateSerializedRecords(): Generator<Uint8Array>
@@ -185,11 +230,11 @@ writeFileSync('modified-catalog.mrc', output);
 Scans a MARC file buffer and builds a lightweight index of record boundaries.
 
 ```typescript
-function indexBuffer(buffer: ArrayBufferLike): RecordIndex[]
+function indexBuffer(buffer: Uint8Array | ArrayBuffer): RecordIndex[]
 ```
 
 **Parameters:**
-- `buffer`: The MARC file as an ArrayBuffer or similar
+- `buffer`: The MARC file as a `Uint8Array` or `ArrayBuffer`
 
 **Returns:** Array of `{ offset: number; length: number }` for each record
 
@@ -214,6 +259,18 @@ interface RecordIndex {
 }
 ```
 
+### RecordSlot
+
+Discriminated union representing the state of each record in the edit layer. Accessible via `store.slots`.
+
+```typescript
+type RecordSlot =
+  | { kind: 'original'; index: number }                      // Unmodified — points to original buffer
+  | { kind: 'modified'; index: number; record: MarcRecord }  // Edited in place
+  | { kind: 'deleted'; index: number }                       // Marked for deletion
+  | { kind: 'inserted'; record: MarcRecord }                 // Newly inserted (no original counterpart)
+```
+
 ### LRUCache<K, V>
 
 Generic Least-Recently-Used cache implementation (also exported for general use).
@@ -233,7 +290,7 @@ class LRUCache<K, V> {
 
 ## Transform Utilities
 
-`marc-store-ts` includes a set of bulk editing and export functions via the `transform` module. All functions operate on the store's live overlay — edits made with `setRecord` are visible to them immediately.
+`marc-store-ts` includes a set of bulk editing and export functions via the `transform` module. All functions operate on the store's live edit layer — edits made with `setRecord` are visible to them immediately.
 
 ### Bulk editing
 
@@ -481,7 +538,7 @@ for (let i = 0; i < store.totalRecords; i++) {
 
 - **Index**: ~16 bytes per record (100K records ≈ 1.6MB)
 - **Cache**: Size of cached records only (configurable)
-- **Overlay**: Size of modified records only (sparse)
+- **Edits**: Size of modified/inserted records only (sparse)
 
 ### Optimization Tips
 

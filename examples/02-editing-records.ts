@@ -11,23 +11,23 @@
  */
 
 import { readFileSync } from 'fs';
-import { indexBuffer, RecordStore } from 'marc-store-ts';
-import { appendField, updateField, removeField } from 'marc-ts';
+import { indexBuffer, MarcFile } from 'marc-store-ts';
+import { appendField, removeField, getField, isDataField } from 'marc-ts';
 
 // Load and index MARC file
 const filePath = process.argv[2] || 'sample-data.mrc';
 console.log(`Loading MARC file: ${filePath}`);
 
-const buffer = readFileSync(filePath).buffer;
+const buffer = readFileSync(filePath);
 const recordIndex = indexBuffer(buffer);
-const store = new RecordStore(buffer, recordIndex);
+const store = new MarcFile(buffer, recordIndex);
 
 console.log(`Loaded ${store.totalRecords} records\n`);
 
 // Example 1: Add a note field to record 0
 console.log('--- Example 1: Adding a Field ---');
 const record0 = store.getRecord(0);
-console.log(`Original field count: ${record0.dataFields.length}`);
+console.log(`Original field count: ${record0.fields.length}`);
 
 const withNote = appendField(record0, {
   tag: '500',
@@ -39,7 +39,7 @@ const withNote = appendField(record0, {
 });
 
 store.setRecord(0, withNote);
-console.log(`Modified field count: ${store.getRecord(0).dataFields.length}`);
+console.log(`Modified field count: ${store.getRecord(0).fields.length}`);
 console.log(`Store now has ${store.modifiedCount} modified record(s)`);
 
 // Example 2: Update an existing field in record 1 (if it exists)
@@ -48,10 +48,11 @@ if (store.totalRecords > 1) {
   const record1 = store.getRecord(1);
 
   // Find first 500 field (note)
-  const noteIndex = record1.dataFields.findIndex(f => f.tag === '500');
+  const note1 = getField(record1, '500');
 
-  if (noteIndex >= 0) {
-    const updated = updateField(record1, noteIndex, {
+  if (note1 && isDataField(note1)) {
+    const without = removeField(record1, note1);
+    const updated = appendField(without, {
       tag: '500',
       indicator1: ' ',
       indicator2: ' ',
@@ -74,10 +75,10 @@ if (store.totalRecords > 2) {
   const record2 = store.getRecord(2);
 
   // Find first 500 field to remove
-  const noteIndex = record2.dataFields.findIndex(f => f.tag === '500');
+  const note2 = getField(record2, '500');
 
-  if (noteIndex >= 0) {
-    const withoutNote = removeField(record2, noteIndex);
+  if (note2 && isDataField(note2)) {
+    const withoutNote = removeField(record2, note2);
     store.setRecord(2, withoutNote);
     console.log(`Removed field 500 from record 2`);
     console.log(`Store now has ${store.modifiedCount} modified record(s)`);
