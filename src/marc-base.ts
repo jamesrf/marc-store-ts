@@ -1,5 +1,5 @@
 import type { MarcRecord } from 'marc-ts';
-import { parseMarcBinary, serializeMarcBinary } from 'marc-ts';
+import { parseMarcBinary } from 'marc-ts';
 import type { RecordIndex } from './record-index.js';
 import { indexBuffer } from './record-index.js';
 import { LRUCache } from './lru-cache.js';

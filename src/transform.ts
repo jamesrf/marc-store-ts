@@ -13,11 +13,12 @@ export function applyToAll(
   store: EditableStore,
   fn: (record: MarcRecord) => MarcRecord,
 ): number {
-  const entries = Array.from(store.iterateRecords());
-  for (const { index, record } of entries) {
+  let count = 0;
+  for (const { index, record } of store.iterateRecords()) {
     store.setRecord(index, fn(record));
+    count++;
   }
-  return entries.length;
+  return count;
 }
 
 /**
@@ -31,9 +32,8 @@ export function applyToMatching(
   predicate: (record: MarcRecord) => boolean,
   fn: (record: MarcRecord) => MarcRecord,
 ): number {
-  const entries = Array.from(store.iterateRecords());
   let count = 0;
-  for (const { index, record } of entries) {
+  for (const { index, record } of store.iterateRecords()) {
     if (predicate(record)) {
       store.setRecord(index, fn(record));
       count++;
@@ -159,19 +159,22 @@ export interface ToJsonOptions {
  */
 export function toJson(store: ReadableStore, options?: ToJsonOptions): string {
   const { pretty = false } = options ?? {};
-  const records = Array.from(store.iterateRecords()).map(({ record }) => ({
-    leader: record.leader,
-    fields: record.fields.map(field => {
-      if (isControlField(field)) {
-        return { tag: field.tag, data: field.data };
-      }
-      return {
-        tag: field.tag,
-        indicator1: field.indicator1,
-        indicator2: field.indicator2,
-        subfields: field.subfields.map(s => ({ code: s.code, value: s.value })),
-      };
-    }),
-  }));
+  const records = [];
+  for (const { record } of store.iterateRecords()) {
+    records.push({
+      leader: record.leader,
+      fields: record.fields.map(field => {
+        if (isControlField(field)) {
+          return { tag: field.tag, data: field.data };
+        }
+        return {
+          tag: field.tag,
+          indicator1: field.indicator1,
+          indicator2: field.indicator2,
+          subfields: field.subfields.map(s => ({ code: s.code, value: s.value })),
+        };
+      }),
+    });
+  }
   return pretty ? JSON.stringify(records, null, 2) : JSON.stringify(records);
 }
