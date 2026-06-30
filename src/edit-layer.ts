@@ -7,10 +7,18 @@ import type { RecordResult, RecordSlot, EditableStore } from './types.js';
 export class EditLayer implements EditableStore {
   private readonly base: MarcBase;
   private readonly _slots: RecordSlot[];
+  private _totalRecords: number;
+  private _modifiedCount: number;
+  private _positionMap: number[] | null;
+  private _positionMapDirty: boolean;
 
   constructor(base: MarcBase) {
     this.base = base;
     this._slots = Array.from({ length: base.indexCount }, (_, i): RecordSlot => ({ kind: 'original', index: i }));
+    this._totalRecords = base.indexCount;
+    this._modifiedCount = 0;
+    this._positionMap = null;
+    this._positionMapDirty = true;
   }
 
   get baseStore(): MarcBase {
@@ -18,11 +26,11 @@ export class EditLayer implements EditableStore {
   }
 
   get totalRecords(): number {
-    return this._slots.filter(s => s.kind !== 'deleted').length;
+    return this._totalRecords;
   }
 
   get modifiedCount(): number {
-    return this._slots.filter(s => s.kind !== 'original').length;
+    return this._modifiedCount;
   }
 
   get slots(): readonly RecordSlot[] {
@@ -68,6 +76,7 @@ export class EditLayer implements EditableStore {
     if (current.kind === 'inserted') {
       this._slots[slotIndex] = { kind: 'inserted', record };
     } else {
+      if (current.kind === 'original') this._modifiedCount++;
       const originalIndex = current.index;
       this._slots[slotIndex] = { kind: 'modified', index: originalIndex, record };
     }
@@ -81,16 +90,24 @@ export class EditLayer implements EditableStore {
     const current = this._slots[slotIndex];
     if (current.kind === 'inserted') {
       this._slots.splice(slotIndex, 1);
+      this._totalRecords--;
+      this._modifiedCount--;
     } else {
+      if (current.kind === 'original') this._modifiedCount++;
       this._slots[slotIndex] = { kind: 'deleted', index: current.index };
       this.base.evictFromCache(current.index);
+      this._totalRecords--;
     }
+    this._positionMapDirty = true;
   }
 
   insertRecord(record: MarcRecord, afterPosition?: number): void {
     record = deepFreezeRecord(record);
     if (afterPosition === undefined) {
       this._slots.push({ kind: 'inserted', record });
+      this._totalRecords++;
+      this._modifiedCount++;
+      this._positionMapDirty = true;
       return;
     }
     const slotIndex = this._slotIndexAt(afterPosition);
@@ -98,6 +115,9 @@ export class EditLayer implements EditableStore {
       throw new RangeError(`Record index ${afterPosition} out of range [0, ${this.totalRecords})`);
     }
     this._slots.splice(slotIndex + 1, 0, { kind: 'inserted', record });
+    this._totalRecords++;
+    this._modifiedCount++;
+    this._positionMapDirty = true;
   }
 
   revertRecord(position: number): void {
@@ -107,6 +127,7 @@ export class EditLayer implements EditableStore {
     if (current.kind === 'modified') {
       this.base.evictFromCache(current.index);
       this._slots[slotIndex] = { kind: 'original', index: current.index };
+      this._modifiedCount--;
     }
   }
 
@@ -122,6 +143,9 @@ export class EditLayer implements EditableStore {
         this._slots[i] = { kind: 'original', index: slot.index };
       }
     }
+    this._totalRecords = this.base.indexCount;
+    this._modifiedCount = 0;
+    this._positionMapDirty = true;
   }
 
   isModified(position: number): boolean {
@@ -158,14 +182,21 @@ export class EditLayer implements EditableStore {
 
   // ========== Private helpers ==========
 
-  private _slotIndexAt(position: number): number {
-    let current = 0;
-    for (let i = 0; i < this._slots.length; i++) {
-      if (this._slots[i].kind === 'deleted') continue;
-      if (current === position) return i;
-      current++;
+  private _ensurePositionMap(): number[] {
+    if (this._positionMap === null || this._positionMapDirty) {
+      const map: number[] = [];
+      for (let i = 0; i < this._slots.length; i++) {
+        if (this._slots[i].kind !== 'deleted') map.push(i);
+      }
+      this._positionMap = map;
+      this._positionMapDirty = false;
     }
-    return -1;
+    return this._positionMap;
+  }
+
+  private _slotIndexAt(position: number): number {
+    const map = this._ensurePositionMap();
+    return position >= 0 && position < map.length ? map[position] : -1;
   }
 
   private _slotAt(position: number): RecordSlot | undefined {
