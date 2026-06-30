@@ -47,16 +47,15 @@ export function indexBuffer(buffer: ArrayBuffer | Uint8Array): RecordIndex[] {
     const lengthBytes = view.subarray(offset, offset + 5);
     const lengthStr = decoder.decode(lengthBytes);
 
-    // Parse to integer
-    const recordLength = parseInt(lengthStr, 10);
-
-    // Validate: not NaN
-    if (isNaN(recordLength)) {
+    // Validate: exactly 5 ASCII digits before parsing
+    if (!/^\d{5}$/.test(lengthStr)) {
       console.warn(
         `indexBuffer: Invalid (non-numeric) length "${lengthStr}" at offset ${offset}. Stopping.`
       );
       break;
     }
+
+    const recordLength = parseInt(lengthStr, 10);
 
     // Validate: >= 24 (minimum valid MARC record)
     if (recordLength < 24) {

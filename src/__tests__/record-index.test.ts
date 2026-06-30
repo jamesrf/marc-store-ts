@@ -80,6 +80,23 @@ describe('indexBuffer', () => {
     consoleWarnSpy.mockRestore();
   });
 
+  it('stops at partial-number length field (e.g. "1234X")', () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const buffer = new Uint8Array(24);
+    const encoder = new TextEncoder();
+    encoder.encodeInto('1234X', buffer); // parseInt would return 1234, but must be rejected
+
+    const index = indexBuffer(buffer);
+
+    expect(index).toHaveLength(0);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid (non-numeric) length')
+    );
+
+    consoleWarnSpy.mockRestore();
+  });
+
   it('stops when record would overflow buffer', () => {
     const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
