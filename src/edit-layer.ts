@@ -36,8 +36,8 @@ export class EditLayer implements EditableStore {
     return this._modifiedCount;
   }
 
-  get slots(): readonly RecordSlot[] {
-    return this._slots;
+  get slots(): readonly Readonly<RecordSlot>[] {
+    return Object.freeze(this._slots.map((s) => Object.freeze({ ...s })));
   }
 
   // ========== Retrieval ==========

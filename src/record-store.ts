@@ -38,7 +38,7 @@ export class MarcFile {
   get modifiedCount(): number {
     return this._edits.modifiedCount;
   }
-  get slots(): readonly RecordSlot[] {
+  get slots(): readonly Readonly<RecordSlot>[] {
     return this._edits.slots;
   }
 
