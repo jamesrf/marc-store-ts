@@ -238,7 +238,7 @@ Feel free to create your own examples based on these templates. Key patterns to 
 
 2. **Load and index:**
    ```typescript
-   const buffer = readFileSync(filePath).buffer;
+   const buffer = new Uint8Array(readFileSync(filePath)).buffer;
    const index = indexBuffer(buffer);
    const store = new RecordStore(buffer, index);
    ```

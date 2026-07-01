@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MarcBase, deepFreezeRecord } from '../marc-base.js';
 import { indexBuffer } from '../record-index.js';
-import { createMultiRecordBuffer, createTypicalRecord, serializeRecord } from './helpers/test-data.js';
+import { createMultiRecordBuffer, createTypicalRecord } from './helpers/test-data.js';
 
 describe('deepFreezeRecord', () => {
   it('freezes the record object itself', () => {

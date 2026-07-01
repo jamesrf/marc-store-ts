@@ -571,7 +571,7 @@ npm run build
 npm test
 
 # Run tests in watch mode
-npm run test:watch
+npx vitest --watch
 
 # Generate coverage report
 npm run test:coverage
@@ -587,14 +587,14 @@ npm run type-check
 
 - `build` - Compile TypeScript to JavaScript (ESM)
 - `test` - Run tests once with Vitest
-- `test:watch` - Run tests in watch mode
+- `test` - Run tests (single run in CI; interactive watch in terminal via `npx vitest --watch`)
 - `test:coverage` - Generate code coverage report
 - `lint` - Lint source code with ESLint
 - `type-check` - Type checking without emitting files
 
 ## Requirements
 
-- Node.js 18+ (for native ESM support)
+- Node.js 22+ recommended (20.19+ minimum; required by Vite 7)
 - TypeScript 5.0+ (if using in TypeScript projects)
 
 ## License
