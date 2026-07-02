@@ -9,3 +9,6 @@ export { indexBuffer } from './record-index.js';
 export type { RecordIndex } from './record-index.js';
 
 export * from './transform.js';
+
+export { SearchIndex, DEFAULT_SEARCH_FIELDS } from './search-index.js';
+export type { SearchIndexOptions, SearchFieldExtractor, SearchResultItem } from './search-index.js';

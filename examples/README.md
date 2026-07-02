@@ -191,9 +191,30 @@ ts-node examples/05-large-files.ts [path-to-large-marc-file]
 
 **Note:** This example is most informative with larger files (10K+ records)
 
+---
+
+### [06-full-text-search.ts](./06-full-text-search.ts)
+
+**What it demonstrates:**
+- Building a `SearchIndex` over a store's records
+- Querying by title, author, and subject terms
+- Keeping the index in sync after edits (rebuild-after-batch pattern)
+- Building multiple independent indexes scoped to specific fields
+- Customizing which fields are indexed via a custom `SearchFieldExtractor`
+
+**Usage:**
+```bash
+ts-node examples/06-full-text-search.ts [path-to-marc-file] [search-term] [isbn]
+
+# Defaults:
+ts-node examples/06-full-text-search.ts sample-data.mrc history
+```
+
+**Output:** Search results for a general query, a field-scoped query, and an ISBN lookup, plus a demonstration of index rebuilding after deleting records
+
 ## Example Output Location
 
-- Examples 01, 02, 04, 05: Read-only (no files created)
+- Examples 01, 02, 04, 05, 06: Read-only (no files created)
 - Example 03: Creates `output.mrc` (or custom output file)
 - Example 05: Creates `output-large.mrc`
 

@@ -16,6 +16,7 @@ A TypeScript library designed to handle large MARC bibliographic files (50K-250K
 - **Zero-Copy Serialization**: Unmodified records are serialized as buffer views (no re-parsing)
 - **Type-Safe API**: Uses discriminated unions for safe error handling
 - **High Performance**: < 0.1ms cache hits, < 10ms cache misses, < 100ms indexing per 1000 records
+- **Full-Text Search**: Pure-JS `SearchIndex` for querying by title, author, subject, or any custom field combination — works identically in Node and the browser
 
 ## Installation
 
@@ -271,6 +272,105 @@ type RecordSlot =
   | { kind: 'inserted'; record: MarcRecord }                 // Newly inserted (no original counterpart)
 ```
 
+## Full-Text Search
+
+`marc-store-ts` includes a `SearchIndex` class for full-text search over a store's records, built on [minisearch](https://github.com/lucaong/minisearch) — pure JavaScript, zero native dependencies, works identically in Node and the browser.
+
+`SearchIndex` is additive: it's built from a snapshot of a store's records via `iterateRecords()` and never mutates the store. It's not wired into `MarcFile` automatically — you build one explicitly when you want search.
+
+### Basic usage
+
+```typescript
+import { readFileSync } from 'fs';
+import { MarcFile, SearchIndex } from 'marc-store-ts';
+
+const store = MarcFile.fromBuffer(readFileSync('catalog.mrc'));
+
+const index = new SearchIndex();
+index.build(store);
+
+const results = index.search('catcher rye');
+for (const { position, score } of results) {
+  console.log(position, score, store.getRecord(position));
+}
+```
+
+By default, `SearchIndex` indexes four fields extracted with `marc-ts` helpers:
+
+| Field | Source |
+|---|---|
+| `title` | 245 $a/$b |
+| `author` | 100/110 $a (main entry) and 700 $a (added entries) |
+| `subjects` | 6XX $a |
+| `contents` | every subfield value, for general recall |
+
+Titles and subjects are boosted higher than general contents by default (configurable via `boost`).
+
+### Keeping the index in sync after edits
+
+`SearchIndex` does not observe `setRecord`/`deleteRecord`/`insertRecord` automatically — there are no mutation hooks on the edit layer. The supported pattern is to rebuild the index after a batch of edits finishes:
+
+```typescript
+import { applyToAll, deleteMatching } from 'marc-store-ts';
+
+deleteMatching(store, record => record.leader[6] === 'u');
+applyToAll(store, record => /* ... */ record);
+
+index.rebuild(store); // re-indexes from the store's current state
+```
+
+This is a full re-index (`O(totalRecords)`), but it sidesteps a subtlety: record `position` values shift when records are deleted or inserted. Because the index is always rebuilt together with the store, `position` values returned by `search()` are never stale.
+
+### Multiple, field-scoped indexes
+
+`SearchIndex` instances are independent and cheap to create. Build several over the same store, each scoped to different fields, to get separately queryable indexes:
+
+```typescript
+const subjectIndex = new SearchIndex({
+  fields: [{ name: 'subjects', extract: record => subjects(record) }],
+});
+subjectIndex.build(store);
+
+const titleAuthorIndex = new SearchIndex({
+  fields: [
+    { name: 'title', extract: record => { const t = title(record); return t ? [t] : []; } },
+    { name: 'author', extract: record => { const a = author(record); return a ? [a] : []; } },
+  ],
+});
+titleAuthorIndex.build(store);
+```
+
+Or index any MARC field/tag pattern via a custom `SearchFieldExtractor` — `marc-ts`'s `getFieldsByPattern(record, pattern)` accepts wildcard patterns like `'6..'`, `'7XX'`, or `'X00'`:
+
+```typescript
+import { getFieldsByPattern, isDataField } from 'marc-ts';
+
+const isbnIndex = new SearchIndex({
+  fields: [{ name: 'isbn', extract: record => isbn(record) }],
+});
+isbnIndex.build(store);
+```
+
+### `SearchIndexOptions`
+
+```typescript
+interface SearchIndexOptions {
+  fields?: SearchFieldExtractor[];    // defaults to DEFAULT_SEARCH_FIELDS
+  boost?: Record<string, number>;     // per-field relevance boost
+  fuzzy?: number | boolean;           // default 0.2
+  prefix?: boolean;                   // default true
+  tokenize?: (text: string, fieldName?: string) => string[];
+  processTerm?: (term: string, fieldName?: string) => string | string[] | null | undefined | false;
+}
+```
+
+`tokenize`/`processTerm` are passed straight through to MiniSearch's constructor, for catalogs where the default tokenizer doesn't handle ISBD punctuation or diacritics the way you want.
+
+### Known limitations
+
+- **Synchronous and blocking.** `build()`/`rebuild()` run on the calling thread; indexing very large stores (100K+ records) will take a visible amount of time and will block the browser main thread if called there. There's no Worker-based indexing built in.
+- **No live sync.** `add(position, record)`/`remove(position)` exist on `SearchIndex` for building a live-sync wrapper around `EditableStore` yourself, but `marc-store-ts` doesn't ship one — `rebuild()` after a batch of edits is the supported pattern.
+
 ## Transform Utilities
 
 `marc-store-ts` includes a set of bulk editing and export functions via the `transform` module. All functions operate on the store's live edit layer — edits made with `setRecord` are visible to them immediately.
@@ -464,6 +564,7 @@ See the [`examples/`](./examples) directory for detailed examples:
 - [**03-serialization.ts**](./examples/03-serialization.ts) - Saving modified files
 - [**04-safe-error-handling.ts**](./examples/04-safe-error-handling.ts) - Using result types
 - [**05-large-files.ts**](./examples/05-large-files.ts) - Performance optimization tips
+- [**06-full-text-search.ts**](./examples/06-full-text-search.ts) - Building and querying a SearchIndex
 
 ### Common Patterns
 
