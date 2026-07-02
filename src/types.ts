@@ -24,5 +24,6 @@ export interface EditableStore extends ReadableStore {
   deleteRecord(position: number): void;
   insertRecord(record: MarcRecord, afterPosition?: number): void;
   revertRecord(position: number): void;
+  revertAll(): void;
   isModified(position: number): boolean;
 }

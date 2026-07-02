@@ -65,6 +65,9 @@ export class MarcFile {
   revertRecord(position: number): void {
     this._edits.revertRecord(position);
   }
+  revertAll(): void {
+    this._edits.revertAll();
+  }
   isModified(position: number): boolean {
     return this._edits.isModified(position);
   }
