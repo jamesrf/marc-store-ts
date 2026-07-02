@@ -75,7 +75,7 @@ export class EditLayer implements EditableStore {
     if (slotIndex === -1) {
       throw new RangeError(`Record index ${position} out of range [0, ${this.totalRecords})`);
     }
-    const current = this._slots[slotIndex];
+    const current = this._slots[slotIndex]!;
     if (current.kind === 'inserted') {
       this._slots[slotIndex] = { kind: 'inserted', record };
     } else {
@@ -90,7 +90,7 @@ export class EditLayer implements EditableStore {
     if (slotIndex === -1) {
       throw new RangeError(`Record index ${position} out of range [0, ${this.totalRecords})`);
     }
-    const current = this._slots[slotIndex];
+    const current = this._slots[slotIndex]!;
     if (current.kind === 'inserted') {
       this._slots.splice(slotIndex, 1);
       this._totalRecords--;
@@ -126,7 +126,7 @@ export class EditLayer implements EditableStore {
   revertRecord(position: number): void {
     const slotIndex = this._slotIndexAt(position);
     if (slotIndex === -1) return;
-    const current = this._slots[slotIndex];
+    const current = this._slots[slotIndex]!;
     if (current.kind === 'modified') {
       this.base.evictFromCache(current.index);
       this._slots[slotIndex] = { kind: 'original', index: current.index };
@@ -136,7 +136,7 @@ export class EditLayer implements EditableStore {
 
   revertAll(): void {
     for (let i = this._slots.length - 1; i >= 0; i--) {
-      const slot = this._slots[i];
+      const slot = this._slots[i]!;
       if (slot.kind === 'inserted') {
         this._slots.splice(i, 1);
       } else if (slot.kind === 'modified') {
@@ -189,7 +189,7 @@ export class EditLayer implements EditableStore {
     if (this._positionMap === null || this._positionMapDirty) {
       const map: number[] = [];
       for (let i = 0; i < this._slots.length; i++) {
-        if (this._slots[i].kind !== 'deleted') map.push(i);
+        if (this._slots[i]!.kind !== 'deleted') map.push(i);
       }
       this._positionMap = map;
       this._positionMapDirty = false;
@@ -199,7 +199,7 @@ export class EditLayer implements EditableStore {
 
   private _slotIndexAt(position: number): number {
     const map = this._ensurePositionMap();
-    return position >= 0 && position < map.length ? map[position] : -1;
+    return position >= 0 && position < map.length ? map[position]! : -1;
   }
 
   private _slotAt(position: number): RecordSlot | undefined {

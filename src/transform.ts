@@ -96,16 +96,13 @@ export function toMarcBinary(store: ReadableStore): Uint8Array {
 }
 
 function escapeXml(s: string): string {
-  return (
-    s
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '�')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;')
-  );
+  return s
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '�')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 export interface ToMarcXmlOptions {

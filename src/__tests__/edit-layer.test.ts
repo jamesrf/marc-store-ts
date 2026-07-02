@@ -354,7 +354,12 @@ describe('EditLayer', () => {
       const layer = makeLayer(5);
       layer.setRecord(
         0,
-        appendField(layer.getRecord(0), { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [] })
+        appendField(layer.getRecord(0), {
+          tag: '500',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [],
+        })
       );
       layer.deleteRecord(2);
       layer.insertRecord(createTypicalRecord('x'));
@@ -390,7 +395,12 @@ describe('EditLayer', () => {
       const layer = makeLayer(3);
       layer.setRecord(
         2,
-        appendField(layer.getRecord(2), { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [] })
+        appendField(layer.getRecord(2), {
+          tag: '500',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [],
+        })
       );
       layer.revertAll();
       expect(layer.slots.every((s) => s.kind === 'original')).toBe(true);
@@ -412,7 +422,12 @@ describe('EditLayer', () => {
       const layer = makeLayer(3);
       layer.setRecord(
         1,
-        appendField(layer.getRecord(1), { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [] })
+        appendField(layer.getRecord(1), {
+          tag: '500',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [],
+        })
       );
       expect(layer.isModified(1)).toBe(true);
     });
@@ -427,7 +442,12 @@ describe('EditLayer', () => {
       const layer = makeLayer(3);
       layer.setRecord(
         0,
-        appendField(layer.getRecord(0), { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [] })
+        appendField(layer.getRecord(0), {
+          tag: '500',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [],
+        })
       );
       layer.revertRecord(0);
       expect(layer.isModified(0)).toBe(false);
@@ -463,7 +483,9 @@ describe('EditLayer', () => {
       // Re-serialized bytes, different buffer
       expect(serialized.buffer).not.toBe(buffer.buffer);
       const reloaded = MarcBase.fromBuffer(serialized);
-      expect(reloaded.getRecord(0).fields.some((f) => isDataField(f) && f.tag === '500')).toBe(true);
+      expect(reloaded.getRecord(0).fields.some((f) => isDataField(f) && f.tag === '500')).toBe(
+        true
+      );
     });
 
     it('returns re-serialized bytes for an inserted slot', () => {
@@ -549,7 +571,7 @@ describe('EditLayer', () => {
       const layer = makeLayer(3);
       const inserted = createTypicalRecord('new');
       layer.insertRecord(inserted, 0); // [orig0, INS, orig1, orig2]
-      layer.deleteRecord(0);           // [INS, orig1, orig2]
+      layer.deleteRecord(0); // [INS, orig1, orig2]
       expect(layer.totalRecords).toBe(3);
       expect(layer.getRecord(0)).toBe(inserted);
     });

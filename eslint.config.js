@@ -1,36 +1,31 @@
-import eslint from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
-import tsparser from '@typescript-eslint/parser';
-import globals from 'globals';
+import tsParser from '@typescript-eslint/parser';
 
 export default [
-  eslint.configs.recommended,
+  {
+    ignores: ['coverage/**', 'dist/**', 'node_modules/**'],
+  },
   {
     files: ['src/**/*.ts'],
     languageOptions: {
-      parser: tsparser,
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
+      parser: tsParser,
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: 'module',
-        project: './tsconfig.eslint.json',
       },
     },
     plugins: {
       '@typescript-eslint': tseslint,
     },
     rules: {
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-explicit-any': 'warn',
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      ...tseslint.configs.recommended.rules,
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
     },
-  },
-  {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
   },
 ];

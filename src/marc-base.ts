@@ -62,7 +62,7 @@ export class MarcBase implements ReadableStore {
     const cached = this.cache.get(index);
     if (cached !== undefined) return cached;
 
-    const { offset, length } = this.recordIndex[index];
+    const { offset, length } = this.recordIndex[index]!;
     if (length < 24) {
       throw new Error(`Record ${index} too short (${length} bytes, minimum 24)`);
     }
@@ -73,7 +73,7 @@ export class MarcBase implements ReadableStore {
         { strict: true }
       );
       if (parsed.length === 0) throw new Error('No record returned');
-      record = deepFreezeRecord(parsed[0]);
+      record = deepFreezeRecord(parsed[0]!);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       throw new Error(`Parse failed at index ${index} (offset ${offset}): ${msg}`);
@@ -100,13 +100,13 @@ export class MarcBase implements ReadableStore {
     if (index < 0 || index >= this.recordIndex.length) {
       throw new RangeError(`Record index ${index} out of range [0, ${this.recordIndex.length})`);
     }
-    const { offset, length } = this.recordIndex[index];
+    const { offset, length } = this.recordIndex[index]!;
     return new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length);
   }
 
   *iterateSerializedRecords(): Generator<Uint8Array> {
     for (let i = 0; i < this.recordIndex.length; i++) {
-      const { offset, length } = this.recordIndex[i];
+      const { offset, length } = this.recordIndex[i]!;
       yield new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length);
     }
   }
