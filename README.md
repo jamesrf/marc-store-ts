@@ -271,23 +271,6 @@ type RecordSlot =
   | { kind: 'inserted'; record: MarcRecord }                 // Newly inserted (no original counterpart)
 ```
 
-### LRUCache<K, V>
-
-Generic Least-Recently-Used cache implementation (also exported for general use).
-
-```typescript
-class LRUCache<K, V> {
-  constructor(capacity: number)
-
-  get(key: K): V | undefined        // Moves accessed entry to end
-  set(key: K, value: V): void       // Updates and moves to end; evicts on overflow
-  delete(key: K): boolean
-  has(key: K): boolean              // Does NOT affect recency
-  clear(): void
-  get size(): number
-}
-```
-
 ## Transform Utilities
 
 `marc-store-ts` includes a set of bulk editing and export functions via the `transform` module. All functions operate on the store's live edit layer — edits made with `setRecord` are visible to them immediately.
