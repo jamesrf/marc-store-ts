@@ -10,5 +10,8 @@ export type { RecordIndex, IndexIssue, ScanOptions, ScanResult } from './record-
 
 export * from './transform.js';
 
+export { iterateRecordResults } from './iterate.js';
+export type { OnRecordError, RecordErrorOptions } from './iterate.js';
+
 export { SearchIndex, DEFAULT_SEARCH_FIELDS } from './search-index.js';
 export type { SearchIndexOptions, SearchFieldExtractor, SearchResultItem } from './search-index.js';

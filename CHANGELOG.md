@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 - `scanBuffer()` returns `{ index, issues, bytesConsumed }` so callers can detect a partially indexed file. Its `recover` option skips corrupt records by resynchronising on the next record terminator.
+- `onError` option (`'throw'` | `'skip'` | callback) on `applyToAll`, `applyToMatching`, `deleteMatching`, `keepMatching`, `toMarcXml`, `toJson` and `SearchIndex.build`/`rebuild`, so one unparseable record no longer has to abort the whole operation. The default remains `'throw'`.
+- `iterateRecordResults(store)`, yielding a `RecordResult` per position instead of throwing.
 - `MarcFile.fromBuffer` / `MarcBase.fromBuffer` accept an options object (`cacheCapacity`, `recover`, `onIssue`) and expose `indexIssues`. A plain cache-capacity number is still accepted.
 - `LICENSE` file (MIT) and full package metadata (`description`, `repository`, `homepage`, `bugs`, `keywords`).
 - `examples/generate-sample-data.ts` and an `npm run examples` script that runs every example in CI.

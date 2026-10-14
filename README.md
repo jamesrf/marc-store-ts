@@ -407,6 +407,26 @@ interface SearchIndexOptions {
 
 `marc-store-ts` includes a set of bulk editing and export functions via the `transform` module. All functions operate on the store's live edit layer — edits made with `setRecord` are visible to them immediately.
 
+### Handling records that fail to parse
+
+By default, a record that cannot be parsed makes the whole operation throw. Every bulk-edit and export function (and `SearchIndex.build`) takes an `onError` option to change that:
+
+| `onError` | Behaviour |
+|---|---|
+| `'throw'` (default) | Stop and rethrow the parse error |
+| `'skip'` | Leave the record out and carry on |
+| `(position, error) => void` | Call the function, then skip the record |
+
+Skipped records are left untouched in the store: `applyToAll`/`applyToMatching` don't modify them, and `deleteMatching`/`keepMatching` keep them. `toMarcXml`/`toJson` omit them. `toMarcBinary` never parses unmodified records, so it writes them unchanged regardless.
+
+```typescript
+const failures: number[] = [];
+applyToAll(store, addNote, { onError: (position) => failures.push(position) });
+writeFileSync('output.xml', toMarcXml(store, { onError: 'skip' }));
+```
+
+To inspect every record's status yourself, `iterateRecordResults(store)` yields `{ index, result }` with a `RecordResult` for each position.
+
 ### Bulk editing
 
 #### `applyToAll(store, fn)`
@@ -618,12 +638,13 @@ store.setRecord(5, modified);
 #### Safe batch processing
 
 ```typescript
-for (let i = 0; i < store.totalRecords; i++) {
-  const result = store.tryGetRecord(i);
+import { iterateRecordResults } from 'marc-store-ts';
+
+for (const { index, result } of iterateRecordResults(store)) {
   if (result.ok) {
     // process result.record
   } else {
-    console.error(`Record ${i}: ${result.error}`);
+    console.error(`Record ${index}: ${result.error}`);
   }
 }
 ```

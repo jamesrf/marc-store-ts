@@ -3,6 +3,8 @@ import type { SearchOptions } from 'minisearch';
 import { getFieldsByPattern, isDataField, subjects, title, author } from 'marc-ts';
 import type { MarcRecord } from 'marc-ts';
 import type { ReadableStore } from './types.js';
+import { iterateReadableRecords } from './iterate.js';
+import type { RecordErrorOptions } from './iterate.js';
 
 /**
  * Extracts zero or more searchable text values for one named field from a
@@ -151,11 +153,14 @@ export class SearchIndex {
    * Discards any previously indexed documents. O(totalRecords), synchronous
    * and blocking — for very large stores this can take a visible amount of
    * time (no Worker-based indexing here).
+   *
+   * Records that cannot be parsed are handled per `options.onError`; skipped
+   * records are not searchable.
    */
-  build(store: ReadableStore): void {
+  build(store: ReadableStore, options: RecordErrorOptions = {}): void {
     this.mini = this.newMiniSearch();
     const docs: IndexedDocument[] = [];
-    for (const { index, record } of store.iterateRecords()) {
+    for (const { index, record } of iterateReadableRecords(store, options.onError)) {
       docs.push(this.toDocument(index, record));
     }
     this.mini.addAll(docs);
@@ -168,8 +173,8 @@ export class SearchIndex {
    * after applyToAll/applyToMatching/deleteMatching) — call rebuild(store)
    * once after the batch completes, rather than updating per-edit.
    */
-  rebuild(store: ReadableStore): void {
-    this.build(store);
+  rebuild(store: ReadableStore, options: RecordErrorOptions = {}): void {
+    this.build(store, options);
   }
 
   /**
