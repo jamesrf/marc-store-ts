@@ -36,7 +36,7 @@ All notable changes to this project are documented here. The format is based on
 - Records with a wrong leader length are now indexed by their 0x1D record terminator (reported as `length-mismatch`), parsed with the length corrected, and written out with a corrected leader. Previously one bad length made the record unparseable and stopped indexing, losing every record after it.
 - Docs: `revertRecord` was documented as restoring deleted records, which it cannot do (a deleted record has no position). Use the new `revert(id)`.
 - `getSerializedRecord()` now returns a copy. It previously returned a view into the store's buffer, so writing to the result corrupted the store. `iterateSerializedRecords()` still yields zero-copy views, now documented as read-only.
-- README: Node requirement, scripts list, `marc-ts` link and architecture description now match the code; unbenchmarked timing claims removed.
+- README: Node requirement, scripts list, `marc-ts` link and architecture description now match the code; unbenchmarked timing claims replaced with measured benchmarks.
 - Examples README: replaced an outdated `marc-ts` snippet and `ts-node` instructions.
 - Indexing no longer stops at whitespace between records, so newline-separated MARC files are fully indexed instead of silently truncated after the first record.
 - Indexing reports records that are missing the 0x1D record terminator.

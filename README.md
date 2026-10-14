@@ -721,7 +721,25 @@ for (let i = 0; i < store.totalRecords; i++) {
 | Serialization (unmodified) | Zero-copy | Yields a view into the original buffer |
 | Serialization (modified) | One record serialize | Re-serializes edited/inserted records only |
 
-Benchmarked timings will be published once a benchmark suite is added.
+### Benchmarks
+
+Measured with `npm run bench` on an Apple M2, Node 26, over synthetic records of about 200 bytes each (10K records ≈ 2 MB, 250K ≈ 51 MB). Each operation runs on a fresh store. Your numbers will vary with record size and hardware; run `npm run bench -- 10000,100000` to measure your own.
+
+| Operation | 10,000 records | 100,000 records | 250,000 records |
+|---|---:|---:|---:|
+| Index (scanBuffer) | 2.7 ms | 27.6 ms | 70.5 ms |
+| Read all records, cold (parse) | 43.2 ms | 389.2 ms | 876.9 ms |
+| Cache hit (per read) | 40 ns | 55 ns | 81 ns |
+| applyToAll (add a field to every record) | 50.7 ms | 500.1 ms | 1.25 s |
+| deleteMatching (half the records) | 41.8 ms | 360.0 ms | 914.6 ms |
+| 1000 single deletes, each followed by a read | 38.7 ms | 386.8 ms | 1.14 s |
+| 1000 single inserts, each followed by a read | 49.4 ms | 476.7 ms | 1.19 s |
+| toMarcBinary (unmodified) | 1.4 ms | 8.2 ms | 30.2 ms |
+| toMarcBinary (every record modified) | 58.3 ms | 513.4 ms | 1.25 s |
+| toMarcXml | 96.8 ms | 881.6 ms | 2.44 s |
+| SearchIndex.build | 114.4 ms | 1.18 s | 3.23 s |
+
+Single inserts and deletes each cost time proportional to the file size, because positions are renumbered; use `deleteRecords` / `insertRecords` (or `deleteMatching`) for batches.
 
 ### Memory Usage
 
