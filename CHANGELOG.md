@@ -22,6 +22,7 @@ All notable changes to this project are documented here. The format is based on
 - The release workflow reuses the CI checks and publishes the exact tarball that passed them.
 
 ### Fixed
+- Docs: `revertRecord` was documented as restoring deleted records, which it cannot do; the README and JSDoc now say to use `revertAll()`. (Per-record restore of deletions is planned with stable record IDs.)
 - `getSerializedRecord()` now returns a copy. It previously returned a view into the store's buffer, so writing to the result corrupted the store. `iterateSerializedRecords()` still yields zero-copy views, now documented as read-only.
 - README: Node requirement, scripts list, `marc-ts` link and architecture description now match the code; unbenchmarked timing claims removed.
 - Examples README: replaced an outdated `marc-ts` snippet and `ts-node` instructions.

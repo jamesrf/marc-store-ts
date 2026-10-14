@@ -175,7 +175,9 @@ if (store.isModified(0)) {
 
 ##### revertRecord(index: number): void
 
-Reverts a modified or deleted record back to its original state. Has no effect on inserted records (use `deleteRecord` to remove them instead).
+Reverts a modified record back to its original state. Has no effect on unmodified or inserted records (use `deleteRecord` to remove an inserted record).
+
+> **Note:** a deleted record no longer has a position, so `revertRecord` cannot restore it: `revertRecord(i)` after `deleteRecord(i)` acts on whichever record has moved into position `i`. Use `revertAll()` to restore deleted records.
 
 ```typescript
 store.revertRecord(0);
@@ -183,7 +185,7 @@ store.revertRecord(0);
 
 ##### deleteRecord(index: number): void
 
-Marks a record as deleted in the edit layer. Deleted records are excluded from `totalRecords` and `iterateRecords()`. Reversible via `revertRecord()`.
+Marks a record as deleted in the edit layer. Deleted records are excluded from `totalRecords` and `iterateRecords()`, and later records shift down one position. Only `revertAll()` can restore a deleted record.
 
 ```typescript
 store.deleteRecord(5);

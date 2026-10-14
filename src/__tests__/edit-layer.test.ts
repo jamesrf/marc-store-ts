@@ -390,6 +390,26 @@ describe('EditLayer', () => {
     });
   });
 
+  describe('revertRecord after deleteRecord', () => {
+    it('does not restore the deleted record (it has no position)', () => {
+      const layer = makeLayer(3);
+      const third = layer.getRecord(2);
+      layer.deleteRecord(1);
+      layer.revertRecord(1);
+      expect(layer.totalRecords).toBe(2);
+      expect(layer.getRecord(1)).toBe(third);
+    });
+
+    it('revertAll restores it', () => {
+      const layer = makeLayer(3);
+      const second = layer.getRecord(1);
+      layer.deleteRecord(1);
+      layer.revertAll();
+      expect(layer.totalRecords).toBe(3);
+      expect(layer.getRecord(1)).toEqual(second);
+    });
+  });
+
   describe('revertAll', () => {
     it('resets modifiedCount to 0', () => {
       const layer = makeLayer(5);

@@ -123,6 +123,11 @@ export class EditLayer implements EditableStore {
     this._positionMapDirty = true;
   }
 
+  /**
+   * Restore the record at `position` to its original content if it was
+   * modified. No-op for unmodified or inserted records. Deleted records have
+   * no position and cannot be restored this way; use `revertAll()`.
+   */
   revertRecord(position: number): void {
     const slotIndex = this._slotIndexAt(position);
     if (slotIndex === -1) return;
