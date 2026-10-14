@@ -7,6 +7,6 @@
       "marc-store-ts": ["./src/index.ts"]
     }
   },
-  "include": ["src/**/*", "examples/**/*"],
+  "include": ["src/**/*", "examples/**/*", "bench/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/__tests__/**"]
 }

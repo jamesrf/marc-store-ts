@@ -42,12 +42,13 @@
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
     "type-check": "tsc --noEmit && tsc -p tsconfig.examples.json",
-    "lint": "eslint src examples",
-    "lint:fix": "eslint src examples --fix",
-    "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"examples/**/*.ts\"",
+    "lint": "eslint src examples bench",
+    "lint:fix": "eslint src examples bench --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\" \"bench/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"examples/**/*.ts\" \"bench/**/*.ts\"",
     "prepublishOnly": "npm run type-check && npm run lint && npm test && npm run build",
-    "examples": "bash scripts/run-examples.sh"
+    "examples": "bash scripts/run-examples.sh",
+    "bench": "npm run build && node --experimental-strip-types bench/run.ts"
   },
   "engines": {
     "node": ">=22"
