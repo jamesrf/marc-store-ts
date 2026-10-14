@@ -138,10 +138,7 @@ export class MarcBase implements ReadableStore, IdentifiedStore {
     const cached = this.cache.get(index);
     if (cached !== undefined) return cached;
 
-    const { offset, length } = this.recordIndex[index]!;
-    if (length < 24) {
-      throw new Error(`Record ${index} too short (${length} bytes, minimum 24)`);
-    }
+    const { offset } = this.recordIndex[index]!;
     let record: MarcRecord;
     try {
       const parsed = parseMarcBinary(this.recordBytes(index), { strict: true });

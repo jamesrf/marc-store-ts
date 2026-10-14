@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Breaking
+- The `slots` getter on `MarcFile`/`EditLayer` is removed: it copied every slot on each access. Use `getSlot(position)` or `iterateSlots()`.
+- `SearchIndex.rebuild()` is removed; it was an alias for `build()`.
 - `MarcFile` now extends `EditLayer` instead of wrapping one, so it inherits every reading, editing and serialization method. The `MarcFile.edits` getter is removed (use the `MarcFile` itself).
 - The `RecordStore` alias for `MarcFile` is removed; import `MarcFile`.
 - `MarcBase.indexCount` is removed; use `totalRecords`, which is identical.
@@ -24,16 +26,13 @@ All notable changes to this project are documented here. The format is based on
 - `deleteRecords(positions)` and `insertRecords(records, afterPosition?)` on `MarcFile`, `EditLayer` and the `EditableStore` interface, for single-pass bulk edits.
 - `npm run bench`: benchmarks over synthetic files of configurable size.
 - `scanBuffer()` returns `{ index, issues, bytesConsumed }` so callers can detect a partially indexed file.
-- `onError` option (`'throw'` | `'skip'` | callback) on `applyToAll`, `applyToMatching`, `deleteMatching`, `keepMatching`, `toMarcXml`, `toJson` and `SearchIndex.build`/`rebuild`, so one unparseable record no longer has to abort the whole operation. The default remains `'throw'`.
+- `onError` option (`'throw'` | `'skip'` | callback) on `applyToAll`, `applyToMatching`, `deleteMatching`, `keepMatching`, `toMarcXml`, `toJson` and `SearchIndex.build`, so one unparseable record no longer has to abort the whole operation. The default remains `'throw'`.
 - `iterateRecordResults(store)`, yielding a `RecordResult` per position instead of throwing.
 - `copyBuffer` option on `fromBuffer` (and the constructors' options) to isolate the store from later writes to the caller's buffer.
 - `MarcBase.getSerializedRecordView()` for explicit zero-copy access to a record's original bytes.
 - `MarcFile.fromBuffer` / `MarcBase.fromBuffer` accept an options object (`cacheCapacity`, `onIssue`, `copyBuffer`) and expose `indexIssues`. A plain cache-capacity number is still accepted.
 - `LICENSE` file (MIT) and full package metadata (`description`, `repository`, `homepage`, `bugs`, `keywords`).
 - `examples/generate-sample-data.ts` and an `npm run examples` script that runs every example in CI.
-
-### Deprecated
-- The `slots` getter, which copies every slot on each access. Use `getSlot` or `iterateSlots`.
 
 ### Changed
 - `SearchIndex` keys documents by stable record ID. `search()` results gain an `id` and report each record's current `position`, leave out records deleted since the build, and stay correct after inserts and deletes without a rebuild. `add()` and `remove()` now take a record ID (for an unedited store, ID and position are the same, so existing calls behave as before).

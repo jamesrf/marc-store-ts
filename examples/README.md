@@ -149,7 +149,7 @@ node --experimental-strip-types examples/05-large-files.ts [path-to-large-marc-f
 **What it demonstrates:**
 - Building a `SearchIndex` over a store's records
 - Querying by title, author, and subject terms
-- Keeping the index in sync after edits (rebuild-after-batch pattern)
+- How search results follow inserts and deletes without re-indexing
 - Building multiple independent indexes scoped to specific fields
 - Customizing which fields are indexed via a custom `SearchFieldExtractor`
 
@@ -161,7 +161,7 @@ node --experimental-strip-types examples/06-full-text-search.ts [path-to-marc-fi
 node --experimental-strip-types examples/06-full-text-search.ts sample-data.mrc history
 ```
 
-**Output:** Search results for a general query, a field-scoped query, and an ISBN lookup, plus a demonstration of index rebuilding after deleting records
+**Output:** Search results for a general query, a field-scoped query, and an ISBN lookup, plus results after deleting records
 
 ## Example Output Location
 

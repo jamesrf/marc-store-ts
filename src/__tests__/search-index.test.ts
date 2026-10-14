@@ -110,7 +110,7 @@ describe('SearchIndex', () => {
     expect(results.map((r) => r.position)).toEqual([0]);
   });
 
-  it('rebuild reflects deletions made after the initial build', () => {
+  it('build again reflects deletions made after the initial build', () => {
     const store = MarcFile.fromBuffer(bufferFrom([catcherRecord, mobyDickRecord]));
     const index = new SearchIndex();
     index.build(store);
@@ -120,7 +120,7 @@ describe('SearchIndex', () => {
       const f = getField(r, '001');
       return f !== undefined && !isDataField(f) && f.data === '00000002';
     });
-    index.rebuild(store);
+    index.build(store);
 
     expect(index.size).toBe(store.totalRecords);
     expect(index.search('whaling')).toEqual([]);

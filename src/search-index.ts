@@ -119,7 +119,6 @@ export class SearchIndex {
     fieldName?: string
   ) => string | string[] | null | undefined | false;
   private mini: MiniSearch<IndexedDocument>;
-  private _size = 0;
   private store: ReadableStore | null = null;
 
   constructor(options: SearchIndexOptions = {}) {
@@ -146,7 +145,7 @@ export class SearchIndex {
 
   /** Number of records currently indexed. */
   get size(): number {
-    return this._size;
+    return this.mini.documentCount;
   }
 
   private toDocument(id: RecordId, record: MarcRecord): IndexedDocument {
@@ -163,6 +162,10 @@ export class SearchIndex {
    * and blocking — for very large stores this can take a visible amount of
    * time (no Worker-based indexing here).
    *
+   * Call it again after a batch of content edits (e.g. applyToAll) to make
+   * the new content searchable; inserts and deletes alone don't need it,
+   * since results follow the store's current positions.
+   *
    * Records that cannot be parsed are handled per `options.onError`; skipped
    * records are not searchable.
    */
@@ -175,17 +178,6 @@ export class SearchIndex {
       docs.push(this.toDocument(idAt(index), record));
     }
     this.mini.addAll(docs);
-    this._size = docs.length;
-  }
-
-  /**
-   * Re-indexes fully from the current state of `store`. Use it after a batch
-   * of content edits (e.g. applyToAll/applyToMatching) to make the new
-   * content searchable. Inserts and deletes alone don't require it: search
-   * results already follow the store's current positions.
-   */
-  rebuild(store: ReadableStore, options: RecordErrorOptions = {}): void {
-    this.build(store, options);
   }
 
   /**
@@ -199,7 +191,6 @@ export class SearchIndex {
       this.mini.replace(doc);
     } else {
       this.mini.add(doc);
-      this._size++;
     }
   }
 
@@ -211,7 +202,6 @@ export class SearchIndex {
   remove(id: RecordId): void {
     if (this.mini.has(id)) {
       this.mini.discard(id);
-      this._size--;
     }
   }
 

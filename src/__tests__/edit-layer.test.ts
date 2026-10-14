@@ -25,14 +25,14 @@ describe('EditLayer', () => {
 
     it('starts with all slots as original', () => {
       const layer = makeLayer(3);
-      expect(layer.slots.every((s) => s.kind === 'original')).toBe(true);
+      expect(Array.from(layer.iterateSlots()).every((s) => s.kind === 'original')).toBe(true);
     });
 
     it('handles empty base (0 records)', () => {
       const layer = makeLayer(0);
       expect(layer.totalRecords).toBe(0);
       expect(layer.modifiedCount).toBe(0);
-      expect(layer.slots).toHaveLength(0);
+      expect(Array.from(layer.iterateSlots())).toHaveLength(0);
     });
 
     it('exposes the base store', () => {
@@ -239,7 +239,7 @@ describe('EditLayer', () => {
       expect(layer.totalRecords).toBe(4);
       layer.deleteRecord(2); // position 2 is the inserted record
       expect(layer.totalRecords).toBe(3);
-      expect(layer.slots.every((s) => s.kind !== 'inserted')).toBe(true);
+      expect(Array.from(layer.iterateSlots()).every((s) => s.kind !== 'inserted')).toBe(true);
     });
 
     it('decrements modifiedCount when removing an inserted record', () => {
@@ -271,7 +271,7 @@ describe('EditLayer', () => {
     it('marks slot as deleted in slots array', () => {
       const layer = makeLayer(3);
       layer.deleteRecord(1);
-      expect(layer.slots.some((s) => s.kind === 'deleted')).toBe(true);
+      expect(Array.from(layer.iterateSlots()).some((s) => s.kind === 'deleted')).toBe(true);
     });
   });
 
@@ -442,14 +442,14 @@ describe('EditLayer', () => {
       layer.insertRecord(createTypicalRecord('a'));
       layer.insertRecord(createTypicalRecord('b'));
       layer.revertAll();
-      expect(layer.slots.every((s) => s.kind === 'original')).toBe(true);
+      expect(Array.from(layer.iterateSlots()).every((s) => s.kind === 'original')).toBe(true);
     });
 
     it('restores deleted slots to original', () => {
       const layer = makeLayer(3);
       layer.deleteRecord(1);
       layer.revertAll();
-      expect(layer.slots.every((s) => s.kind === 'original')).toBe(true);
+      expect(Array.from(layer.iterateSlots()).every((s) => s.kind === 'original')).toBe(true);
     });
 
     it('restores modified slots to original', () => {
@@ -464,7 +464,7 @@ describe('EditLayer', () => {
         })
       );
       layer.revertAll();
-      expect(layer.slots.every((s) => s.kind === 'original')).toBe(true);
+      expect(Array.from(layer.iterateSlots()).every((s) => s.kind === 'original')).toBe(true);
     });
 
     it('is a no-op when there are no modifications', () => {
@@ -669,8 +669,8 @@ describe('EditLayer bulk operations', () => {
       layer.deleteRecords([1, 2]); // the inserted record and the modified one
       expect(layer.totalRecords).toBe(2);
       expect(layer.modifiedCount).toBe(1); // the modified record, now deleted
-      expect(layer.slots.some((s) => s.kind === 'inserted')).toBe(false);
-      expect(layer.slots.filter((s) => s.kind === 'deleted')).toHaveLength(1);
+      expect(Array.from(layer.iterateSlots()).some((s) => s.kind === 'inserted')).toBe(false);
+      expect(Array.from(layer.iterateSlots()).filter((s) => s.kind === 'deleted')).toHaveLength(1);
     });
 
     it('deletes nothing if any position is out of range', () => {
@@ -742,7 +742,7 @@ describe('EditLayer stable record IDs', () => {
   it('gives original records their file index as ID', () => {
     const layer = makeLayer(3);
     expect([0, 1, 2].map((p) => layer.idAt(p))).toEqual([0, 1, 2]);
-    expect(layer.slots.map((s) => s.id)).toEqual([0, 1, 2]);
+    expect(Array.from(layer.iterateSlots()).map((s) => s.id)).toEqual([0, 1, 2]);
   });
 
   it('keeps IDs stable as positions shift', () => {
@@ -878,6 +878,5 @@ describe('EditLayer slot access', () => {
     layer.insertRecord(createTypicalRecord('ins'));
     const slots = Array.from(layer.iterateSlots());
     expect(slots.map((s) => s.kind)).toEqual(['deleted', 'original', 'original', 'inserted']);
-    expect(slots).toEqual(layer.slots);
   });
 });

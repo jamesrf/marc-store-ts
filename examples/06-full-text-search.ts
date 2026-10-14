@@ -4,7 +4,7 @@
  * This example demonstrates:
  * - Building a SearchIndex over a store's records
  * - Querying by title, author, and subject terms
- * - Keeping the index in sync after edits (rebuild-after-batch pattern)
+ * - How search results follow inserts and deletes without re-indexing
  * - Building multiple independent indexes scoped to specific fields
  * - Customizing which fields are indexed
  */

@@ -271,7 +271,7 @@ describe('MarcFile', () => {
       expect(store.totalRecords).toBe(4);
       store.deleteRecord(2); // the inserted one
       expect(store.totalRecords).toBe(3);
-      expect(store.slots.every((s) => s.kind !== 'inserted')).toBe(true);
+      expect(Array.from(store.iterateSlots()).every((s) => s.kind !== 'inserted')).toBe(true);
     });
   });
 

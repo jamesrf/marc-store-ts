@@ -118,7 +118,6 @@ constructor(
 ```typescript
 totalRecords: number                       // Total number of records in the file
 modifiedCount: number                      // Number of edited records
-slots: readonly Readonly<RecordSlot>[]     // Deprecated: copies every slot on each access; use getSlot/iterateSlots
 base: MarcBase                             // Advanced: underlying buffer and LRU cache layer
 indexIssues: readonly IndexIssue[]         // Problems found while indexing (see scanBuffer)
 ```
@@ -340,7 +339,7 @@ for (const id of store.deletedIds()) store.revert(id);
 
 ### RecordSlot
 
-Discriminated union representing the state of each record in the edit layer. Read one with `store.getSlot(position)` (undefined if out of range), or all of them, including deleted records, in file order with `store.iterateSlots()`. The older `store.slots` getter still works but copies every slot on each access, so avoid it on large files.
+Discriminated union representing the state of each record in the edit layer. Read one with `store.getSlot(position)` (undefined if out of range), or all of them, including deleted records, in file order with `store.iterateSlots()`.
 
 ```typescript
 type RecordSlot =
@@ -389,7 +388,7 @@ Titles and subjects are boosted higher than general contents by default (configu
 Results are keyed by each record's [stable ID](#stable-record-ids), and `search()` translates IDs into the store's **current** positions. Each result is `{ id, position, score, match }`. So:
 
 - **Inserts and deletes need no action.** Positions in results follow the store, and deleted records drop out of the results (and come back if you `revert` them).
-- **Content edits** (`setRecord`, `applyToAll`, ...) aren't seen until you re-index. For a few records, use `add(id, record)`; after a large batch, `rebuild(store)`:
+- **Content edits** (`setRecord`, `applyToAll`, ...) aren't seen until you re-index. For a few records, use `add(id, record)`; after a large batch, call `build(store)` again:
 
 ```typescript
 import { applyToAll } from 'marc-store-ts';
@@ -398,12 +397,12 @@ store.setRecord(5, edited);
 index.add(store.idAt(5), store.getRecord(5));   // re-index one record
 
 applyToAll(store, record => /* ... */ record);
-index.rebuild(store);                            // re-index everything
+index.build(store);                              // re-index everything
 ```
 
 Inserted records are not searchable until added: `index.add(store.idAt(position), record)`. `remove(id)` takes an entry out of the index; it isn't needed after a delete.
 
-`SearchIndex` works with any `ReadableStore`. For a store without stable IDs, IDs are positions, and you should rebuild after inserts or deletes.
+`SearchIndex` works with any `ReadableStore`. For a store without stable IDs, IDs are positions, and you should call `build(store)` again after inserts or deletes.
 
 ### Multiple, field-scoped indexes
 
@@ -452,8 +451,8 @@ interface SearchIndexOptions {
 
 ### Known limitations
 
-- **Synchronous and blocking.** `build()`/`rebuild()` run on the calling thread; indexing very large stores (100K+ records) will take a visible amount of time and will block the browser main thread if called there. There's no Worker-based indexing built in.
-- **No live sync.** `add(position, record)`/`remove(position)` exist on `SearchIndex` for building a live-sync wrapper around `EditableStore` yourself, but `marc-store-ts` doesn't ship one — `rebuild()` after a batch of edits is the supported pattern.
+- **Synchronous and blocking.** `build()` runs on the calling thread; indexing very large stores (100K+ records) will take a visible amount of time and will block the browser main thread if called there. There's no Worker-based indexing built in.
+- **Content edits aren't tracked automatically.** Inserts and deletes are reflected in results without any action, but changed record content is only searchable after `add(id, record)` or another `build(store)`.
 
 ## Transform Utilities
 
