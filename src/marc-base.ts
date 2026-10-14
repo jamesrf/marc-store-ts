@@ -14,6 +14,7 @@ import type {
 } from './types.js';
 import { normalizeFromBufferOptions } from './types.js';
 
+/** Freeze `record` and everything in it, in place, and return it. */
 export function deepFreezeRecord(record: MarcRecord): MarcRecord {
   Object.freeze(record);
   Object.freeze(record.fields);
@@ -73,6 +74,13 @@ function leaderLengthMatches(bytes: Uint8Array, length: number): boolean {
   return n === length;
 }
 
+/**
+ * The read-only base layer of a store: the raw MARC buffer, the record
+ * index (byte offset and length of each record) and an LRU cache of parsed
+ * records. Records are parsed lazily, on first access, and returned frozen.
+ * Records never move, so a record's position, index and ID are the same
+ * number. `EditLayer` adds copy-on-write editing on top.
+ */
 export class MarcBase implements ReadableStore, IdentifiedStore {
   private readonly rawBuffer: ArrayBuffer;
   private readonly rawBufferOffset: number;
@@ -119,10 +127,16 @@ export class MarcBase implements ReadableStore, IdentifiedStore {
     return new MarcBase(buffer, index, cacheCapacity, { indexIssues: issues, copyBuffer });
   }
 
+  /** Number of records in the index. */
   get totalRecords(): number {
     return this.recordIndex.length;
   }
 
+  /**
+   * The record at `index`, parsed on first access and served from the cache
+   * afterwards. The record is frozen. Throws `RangeError` if `index` is out of
+   * range, or an `Error` ("Parse failed at index …") if the bytes don't parse.
+   */
   getRecord(index: number): MarcRecord {
     if (index < 0 || index >= this.recordIndex.length) {
       throw new RangeError(`Record index ${index} out of range [0, ${this.recordIndex.length})`);
@@ -152,10 +166,15 @@ export class MarcBase implements ReadableStore, IdentifiedStore {
     return index;
   }
 
+  /**
+   * The position of the record with `id` (the same number), or undefined if
+   * out of range.
+   */
   positionOf(id: RecordId): number | undefined {
     return Number.isInteger(id) && id >= 0 && id < this.recordIndex.length ? id : undefined;
   }
 
+  /** Like `getRecord`, but returns `{ ok: false, error }` instead of throwing. */
   tryGetRecord(index: number): RecordResult {
     try {
       return { ok: true, record: this.getRecord(index) };
@@ -164,6 +183,11 @@ export class MarcBase implements ReadableStore, IdentifiedStore {
     }
   }
 
+  /**
+   * Yields every record in order, parsing as it goes. Throws on the first
+   * record that fails to parse; see `iterateRecordResults` for a version that
+   * doesn't.
+   */
   *iterateRecords(): Generator<{ index: number; record: MarcRecord }> {
     for (let i = 0; i < this.recordIndex.length; i++) {
       yield { index: i, record: this.getRecord(i) };
@@ -216,6 +240,11 @@ export class MarcBase implements ReadableStore, IdentifiedStore {
     return repaired;
   }
 
+  /**
+   * Drop the record at `index` from the parsed-record cache, if present. Used
+   * by `EditLayer` when a record's edit state changes; you don't normally need
+   * to call it.
+   */
   evictFromCache(index: number): void {
     this.cache.delete(index);
   }

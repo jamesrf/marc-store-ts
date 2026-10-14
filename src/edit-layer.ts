@@ -10,6 +10,17 @@ import type {
   IdentifiedStore,
 } from './types.js';
 
+/**
+ * Copy-on-write editing over a `MarcBase`. Edits are kept as a slot per
+ * record (`original`, `modified`, `deleted` or `inserted`), so the base
+ * buffer is never changed and unmodified records are still read and
+ * serialized straight from it.
+ *
+ * Records are addressed two ways: by **position** (0-based among the records
+ * that currently exist; positions shift on insert and delete) and by stable
+ * **ID** (see `RecordId`), which never changes. `MarcFile` is an `EditLayer`
+ * built from a buffer.
+ */
 export class EditLayer implements EditableStore, IdentifiedStore {
   private readonly _base: MarcBase;
   private _slots: RecordSlot[];
@@ -36,14 +47,23 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     this._positionMapDirty = true;
   }
 
+  /** The underlying read-only store. */
   get baseStore(): MarcBase {
     return this._base;
   }
 
+  /**
+   * Number of records that currently exist (deleted ones excluded, inserted
+   * ones included).
+   */
   get totalRecords(): number {
     return this._totalRecords;
   }
 
+  /**
+   * Number of records that differ from the original file: modified, deleted
+   * or inserted.
+   */
   get modifiedCount(): number {
     return this._modifiedCount;
   }
@@ -61,6 +81,12 @@ export class EditLayer implements EditableStore, IdentifiedStore {
 
   // ========== Retrieval ==========
 
+  /**
+   * The current record at `position`: the edited version if it was modified
+   * or inserted, otherwise the original (parsed on demand). The record is
+   * frozen. Throws `RangeError` if out of range, or an `Error` if an original
+   * record fails to parse.
+   */
   getRecord(position: number): MarcRecord {
     const slot = this._slotAt(position);
     if (slot === undefined) {
@@ -69,6 +95,7 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     return this._resolveSlot(slot, position);
   }
 
+  /** Like `getRecord`, but returns `{ ok: false, error }` instead of throwing. */
   tryGetRecord(position: number): RecordResult {
     try {
       return { ok: true, record: this.getRecord(position) };
@@ -77,6 +104,11 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     }
   }
 
+  /**
+   * Yields every current record in position order, as `{ index, record }`
+   * where `index` is the position. Throws on the first original record that
+   * fails to parse; see `iterateRecordResults` for a version that doesn't.
+   */
   *iterateRecords(): Generator<{ index: number; record: MarcRecord }> {
     let position = 0;
     for (const slot of this._slots) {
@@ -88,6 +120,11 @@ export class EditLayer implements EditableStore, IdentifiedStore {
 
   // ========== Editing ==========
 
+  /**
+   * Replace the record at `position`. The store keeps a deep-frozen copy
+   * (reusing parts that are already frozen) and never modifies `record`.
+   * The record keeps its ID. Throws `RangeError` if out of range.
+   */
   setRecord(position: number, record: MarcRecord): void {
     record = toFrozenRecord(record);
     const slotIndex = this._slotIndexAt(position);
@@ -104,6 +141,12 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     }
   }
 
+  /**
+   * Delete the record at `position`; later records shift down one position.
+   * An original record can be restored with `revert(id)` or `revertAll()`; an
+   * inserted record is removed outright. Costs O(n); use `deleteRecords` for
+   * batches. Throws `RangeError` if out of range.
+   */
   deleteRecord(position: number): void {
     const slotIndex = this._slotIndexAt(position);
     if (slotIndex === -1) {
@@ -165,6 +208,12 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     this._invalidateMaps();
   }
 
+  /**
+   * Insert a record after `afterPosition`, or at the end if omitted. It gets a
+   * new ID. The store keeps a frozen copy and never modifies `record`. Costs
+   * O(n); use `insertRecords` for batches. Throws `RangeError` if
+   * `afterPosition` is out of range.
+   */
   insertRecord(record: MarcRecord, afterPosition?: number): void {
     record = toFrozenRecord(record);
     if (afterPosition === undefined) {
@@ -229,6 +278,11 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     }
   }
 
+  /**
+   * Discard every edit: modified and deleted records return to their
+   * original state and inserted records are removed. IDs of removed inserted
+   * records are not reused.
+   */
   revertAll(): void {
     for (let i = this._slots.length - 1; i >= 0; i--) {
       const slot = this._slots[i]!;
@@ -308,6 +362,10 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     return ids;
   }
 
+  /**
+   * True if the record at `position` differs from the original file
+   * (modified or inserted). False if unmodified or out of range.
+   */
   isModified(position: number): boolean {
     const slot = this._slotAt(position);
     return slot !== undefined && slot.kind !== 'original';

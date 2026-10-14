@@ -48,7 +48,8 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"examples/**/*.ts\" \"bench/**/*.ts\"",
     "prepublishOnly": "npm run type-check && npm run lint && npm test && npm run build",
     "examples": "bash scripts/run-examples.sh",
-    "bench": "npm run build && node --experimental-strip-types bench/run.ts"
+    "bench": "npm run build && node --experimental-strip-types bench/run.ts",
+    "docs": "typedoc"
   },
   "engines": {
     "node": ">=22"
@@ -69,6 +70,7 @@
     "eslint": "^10.4.0",
     "marc-ts": "^0.4.2",
     "prettier": "^3.9.4",
+    "typedoc": "^0.28.20",
     "typescript": "^5.9.0",
     "vite": "^8.0.13",
     "vite-plugin-dts": "^5.0.0",

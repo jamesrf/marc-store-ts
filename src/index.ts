@@ -1,5 +1,12 @@
 export { MarcFile } from './marc-file.js';
-export type { RecordResult, RecordSlot } from './types.js';
+export type {
+  RecordResult,
+  RecordSlot,
+  OriginalSlot,
+  ModifiedSlot,
+  DeletedSlot,
+  InsertedSlot,
+} from './types.js';
 export type {
   ReadableStore,
   EditableStore,

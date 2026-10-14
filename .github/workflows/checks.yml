@@ -40,6 +40,8 @@ jobs:
 
       - run: npm run examples
 
+      - run: npm run docs
+
       - name: Pack tarball
         if: matrix.node-version == 26
         run: npm pack --cache .npm-cache

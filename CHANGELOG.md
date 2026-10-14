@@ -20,6 +20,7 @@ All notable changes to this project are documented here. The format is based on
 - `toMarcXml`'s `encoding` option is removed. It only changed the XML declaration, never the output, which is always UTF-8.
 
 ### Added
+- Generated API reference (TypeDoc, `npm run docs`), published to GitHub Pages; TSDoc on every public member of `MarcBase`, `EditLayer` and the store interfaces. The `OriginalSlot`, `ModifiedSlot`, `DeletedSlot` and `InsertedSlot` types are now exported.
 - Per-query options for `SearchIndex.search(query, options)`: `limit`, `fields`, `combineWith`, `fuzzy`, `prefix`, `boost` and `filter`. A number is still accepted as the limit.
 - `iterateMarcBinary(store)`, `iterateMarcXml(store)` and `iterateJson(store)` stream exports one chunk per record, for files too large to build as a single string.
 - `toJson` options `format: 'marc-in-json' | 'simple'` and `ndjson`.

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "docs-api",
+  "name": "marc-store-ts",
+  "readme": "README.md",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "includeVersion": true,
+  "validation": { "notExported": true, "invalidLink": true, "notDocumented": false },
+  "treatWarningsAsErrors": true
+}

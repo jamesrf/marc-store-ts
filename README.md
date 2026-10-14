@@ -65,6 +65,8 @@ This design ensures:
 
 ## API Documentation
 
+A generated API reference for every export is published at **https://jamesrf.github.io/marc-store-ts/** (build it locally with `npm run docs`, output in `docs-api/`). This section covers the main APIs with examples.
+
 ### MarcFile
 
 The main storage engine for MARC files. `MarcFile` is an `EditLayer` (copy-on-write edits) over a `MarcBase` (the raw buffer, record index and LRU cache), so every method below is also available on `EditLayer`.
@@ -727,14 +729,14 @@ writeFileSync('output.json', toJson(store, { pretty: true }));
 
 ## Usage Examples
 
-See the [`examples/`](./examples) directory for detailed examples:
+See the [`examples/`](https://github.com/jamesrf/marc-store-ts/tree/main/examples) directory for detailed examples:
 
-- [**01-basic-usage.ts**](./examples/01-basic-usage.ts) - Loading and reading records
-- [**02-editing-records.ts**](./examples/02-editing-records.ts) - Modifying and reverting records
-- [**03-serialization.ts**](./examples/03-serialization.ts) - Saving modified files
-- [**04-safe-error-handling.ts**](./examples/04-safe-error-handling.ts) - Using result types
-- [**05-large-files.ts**](./examples/05-large-files.ts) - Performance optimization tips
-- [**06-full-text-search.ts**](./examples/06-full-text-search.ts) - Building and querying a SearchIndex
+- [**01-basic-usage.ts**](https://github.com/jamesrf/marc-store-ts/blob/main/examples/01-basic-usage.ts) - Loading and reading records
+- [**02-editing-records.ts**](https://github.com/jamesrf/marc-store-ts/blob/main/examples/02-editing-records.ts) - Modifying and reverting records
+- [**03-serialization.ts**](https://github.com/jamesrf/marc-store-ts/blob/main/examples/03-serialization.ts) - Saving modified files
+- [**04-safe-error-handling.ts**](https://github.com/jamesrf/marc-store-ts/blob/main/examples/04-safe-error-handling.ts) - Using result types
+- [**05-large-files.ts**](https://github.com/jamesrf/marc-store-ts/blob/main/examples/05-large-files.ts) - Performance optimization tips
+- [**06-full-text-search.ts**](https://github.com/jamesrf/marc-store-ts/blob/main/examples/06-full-text-search.ts) - Building and querying a SearchIndex
 
 ### Common Patterns
 
@@ -870,6 +872,8 @@ npm run build && npm run examples
 - `format` / `format:check` - Format `src/` and `examples/` with Prettier
 - `type-check` - Type-check the library and the examples without emitting files
 - `examples` - Generate sample data and run every example against it
+- `docs` - Generate the TypeDoc API reference into `docs-api/`
+- `bench` - Build, then run the benchmarks
 
 ## Requirements
 
