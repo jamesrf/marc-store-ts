@@ -15,7 +15,14 @@ export interface RecordIndex {
  * - `overflow`: the declared length runs past the end of the buffer
  * - `missing-terminator`: the record does not end with the 0x1D record terminator
  *   (the record is still indexed; it may fail to parse)
- * - `skipped`: in recover mode, bytes that were skipped to resynchronise
+ * - `length-mismatch`: the leader length disagrees with the record terminator;
+ *   the record is indexed using the terminator, and the store corrects the
+ *   leader length when parsing and writing it
+ * - `skipped`: bytes ending in a terminator that were too short to be a record
+ *
+ * The first four kinds are only reported when scanning stops because no
+ * record terminator follows; otherwise the record is indexed by its
+ * terminator and reported as `length-mismatch`.
  */
 export interface IndexIssue {
   kind:
@@ -24,17 +31,17 @@ export interface IndexIssue {
     | 'too-short'
     | 'overflow'
     | 'missing-terminator'
+    | 'length-mismatch'
     | 'skipped';
   offset: number;
   message: string;
+  /** For `length-mismatch`: the leader's length field as found (up to 5 characters). */
+  declaredLength?: string;
+  /** For `length-mismatch` and `skipped`: the actual number of bytes. */
+  length?: number;
 }
 
 export interface ScanOptions {
-  /**
-   * When true, an invalid record is skipped by resynchronising on the next
-   * 0x1D record terminator instead of stopping. Default false.
-   */
-  recover?: boolean;
   /** Called for each issue as it is found. */
   onIssue?: (issue: IndexIssue) => void;
 }
@@ -67,24 +74,24 @@ function isDigit(byte: number): boolean {
  * Scan a MARC21 buffer and build an index of record boundaries, reporting
  * any problems found instead of only logging them.
  *
- * Reads only each record's 5-byte leader length (plus its last byte to check
- * for the record terminator); record content is not parsed. Whitespace
- * between records is skipped.
+ * Uses each record's 5-byte leader length, cross-checked against the 0x1D
+ * record terminator; record content is not parsed. Whitespace between
+ * records is skipped. When the leader length is wrong, the terminator is used
+ * as the record boundary instead (reported as `length-mismatch`).
  *
- * Never throws and never logs. Without `recover`, scanning stops at the first
- * invalid record; check `issues` (or compare `bytesConsumed` with the buffer
- * length) to detect a partial index.
+ * Never throws and never logs. Scanning stops only when a record's length is
+ * unusable and no record terminator follows; check `issues` (or compare
+ * `bytesConsumed` with the buffer length) to detect a partial index.
  */
 export function scanBuffer(
   buffer: ArrayBuffer | Uint8Array,
   options: ScanOptions = {}
 ): ScanResult {
   const view = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-  const { recover = false, onIssue } = options;
+  const { onIssue } = options;
   const index: RecordIndex[] = [];
   const issues: IndexIssue[] = [];
-  const report = (kind: IndexIssue['kind'], offset: number, message: string): void => {
-    const issue = { kind, offset, message };
+  const report = (issue: IndexIssue): void => {
     issues.push(issue);
     onIssue?.(issue);
   };
@@ -96,39 +103,75 @@ export function scanBuffer(
       continue;
     }
 
+    // A well-formed record contains exactly one terminator, as its last byte.
+    const terminator = view.indexOf(RECORD_TERMINATOR, offset);
     const problem = checkRecordAt(view, offset);
-    if (problem === null) {
-      const recordLength = readLength(view, offset);
-      if (view[offset + recordLength - 1] !== RECORD_TERMINATOR) {
-        report(
-          'missing-terminator',
-          offset,
-          `indexBuffer: Record at offset ${offset} (length ${recordLength}) does not end with the 0x1D record terminator.`
-        );
-      }
-      index.push({ offset, length: recordLength });
-      offset += recordLength;
+    const declared = problem === null ? readLength(view, offset) : -1;
+    const declaredEnd = offset + declared - 1;
+
+    if (problem === null && terminator === declaredEnd) {
+      index.push({ offset, length: declared });
+      offset += declared;
       continue;
     }
 
-    if (!recover) {
-      report(problem.kind, offset, `${problem.message} Stopping.`);
+    // Usable length but no terminator where expected. Trust the length if it
+    // lands on a valid boundary (or no terminator follows at all), so a record
+    // that merely lacks its terminator doesn't swallow the next one.
+    if (
+      problem === null &&
+      (terminator === -1 || (terminator > declaredEnd && isRecordBoundary(view, offset + declared)))
+    ) {
+      report({
+        kind: 'missing-terminator',
+        offset,
+        message: `indexBuffer: Record at offset ${offset} (length ${declared}) does not end with the 0x1D record terminator.`,
+      });
+      index.push({ offset, length: declared });
+      offset += declared;
+      continue;
+    }
+
+    if (terminator === -1) {
+      report({ kind: problem!.kind, offset, message: `${problem!.message} Stopping.` });
       break;
     }
 
-    // Recover: skip past the next record terminator and carry on from there.
-    report(problem.kind, offset, `${problem.message} Skipping to next record terminator.`);
-    const terminator = view.indexOf(RECORD_TERMINATOR, offset);
-    const resumeAt = terminator === -1 ? view.length : terminator + 1;
-    report(
-      'skipped',
-      offset,
-      `indexBuffer: Skipped ${resumeAt - offset} bytes at offset ${offset}.`
+    // The leader length is wrong; the terminator marks the real end.
+    const actual = terminator + 1 - offset;
+    const declaredLength = String.fromCharCode(
+      ...view.subarray(offset, Math.min(offset + 5, view.length))
     );
-    offset = resumeAt;
+    if (actual < MIN_RECORD_LENGTH) {
+      report({
+        kind: 'skipped',
+        offset,
+        length: actual,
+        message: `indexBuffer: Skipped ${actual} bytes at offset ${offset} (too short to be a record).`,
+      });
+    } else {
+      report({
+        kind: 'length-mismatch',
+        offset,
+        declaredLength,
+        length: actual,
+        message: `indexBuffer: Record at offset ${offset} has leader length "${declaredLength}" but ends at the record terminator after ${actual} bytes. Using ${actual}.`,
+      });
+      index.push({ offset, length: actual });
+    }
+    offset = terminator + 1;
   }
 
   return { index, issues, bytesConsumed: offset };
+}
+
+/** True at end of buffer (ignoring trailing whitespace) or at a well-formed record. */
+function isRecordBoundary(view: Uint8Array, offset: number): boolean {
+  while (offset < view.length && isInterRecordWhitespace(view[offset]!)) offset++;
+  if (offset >= view.length) return true;
+  if (checkRecordAt(view, offset) !== null) return false;
+  const end = offset + readLength(view, offset) - 1;
+  return view.indexOf(RECORD_TERMINATOR, offset) === end;
 }
 
 function readLength(view: Uint8Array, offset: number): number {

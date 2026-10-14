@@ -79,7 +79,6 @@ static fromBuffer(
 
 interface FromBufferOptions {
   cacheCapacity?: number;                  // LRU cache size (default 200)
-  recover?: boolean;                       // skip corrupt records instead of stopping (default false)
   onIssue?: (issue: IndexIssue) => void;   // replaces the default console.warn
   copyBuffer?: boolean;                    // copy the buffer instead of referencing it (default false)
 }
@@ -223,7 +222,7 @@ for (const { index, record } of store.iterateRecords()) {
 
 Serializes all records (modified and unmodified) for saving to a file.
 
-**Zero-copy optimization**: Unmodified records yield Uint8Array views into the original buffer without re-parsing. These views share memory with the store, so treat them as read-only: writing to one corrupts the store.
+**Zero-copy optimization**: Unmodified records yield Uint8Array views into the original buffer without re-parsing. These views share memory with the store, so treat them as read-only: writing to one corrupts the store. Records whose leader length was wrong (see [`scanBuffer()`](#scanbuffer)) are yielded as copies with the length corrected.
 
 ```typescript
 import { writeFileSync } from 'fs';
@@ -244,13 +243,12 @@ writeFileSync('modified-catalog.mrc', output);
 
 ### scanBuffer()
 
-Scans a MARC file buffer and builds a lightweight index of record boundaries, returning any problems as data. It reads only each record's 5-byte length (and checks its last byte for the `0x1D` record terminator); record content is not parsed. It never throws and never logs.
+Scans a MARC file buffer and builds a lightweight index of record boundaries, returning any problems as data. It uses each record's 5-byte leader length, cross-checked against the `0x1D` record terminator; record content is not parsed. It never throws and never logs.
 
 ```typescript
 function scanBuffer(buffer: Uint8Array | ArrayBuffer, options?: ScanOptions): ScanResult
 
 interface ScanOptions {
-  recover?: boolean;                      // resync on the next 0x1D instead of stopping (default false)
   onIssue?: (issue: IndexIssue) => void;  // called as each issue is found
 }
 
@@ -262,19 +260,23 @@ interface ScanResult {
 
 interface IndexIssue {
   kind: 'truncated-length' | 'invalid-length' | 'too-short' | 'overflow'
-      | 'missing-terminator' | 'skipped';
+      | 'missing-terminator' | 'length-mismatch' | 'skipped';
   offset: number;
   message: string;
+  declaredLength?: string;  // length-mismatch: the leader's length field as found
+  length?: number;          // length-mismatch / skipped: the actual byte count
 }
 ```
 
 Behaviour:
 - Whitespace between records (newlines, spaces, NUL padding), which some exports add, is skipped.
-- A record whose last byte is not `0x1D` is still indexed, with a `missing-terminator` issue.
-- An invalid length stops the scan, unless `recover` is set, in which case the scanner skips to the byte after the next `0x1D` and continues, reporting a `skipped` issue.
+- **Wrong leader lengths** (too long, too short, past the end of the file, below 24, or not a number) are common in real files, for example after an encoding conversion. When the leader length disagrees with the record terminator, the terminator is used as the record boundary and a `length-mismatch` issue is reported. The store then parses the record with its leader length corrected, and writes it out corrected (only the 5 length digits change), so one bad length doesn't cost you that record or its neighbours.
+- A record that is missing its `0x1D` but whose length lands on the start of a valid record (or the end of the file) keeps its declared length, with a `missing-terminator` issue.
+- Bytes ending in a `0x1D` that are too short to be a record are reported as `skipped`, and scanning continues.
+- Scanning stops only when a length is unusable and no record terminator follows; the original problem (`truncated-length`, `invalid-length`, `too-short` or `overflow`) is reported.
 
 ```typescript
-const { index, issues } = scanBuffer(buffer, { recover: true });
+const { index, issues } = scanBuffer(buffer);
 console.log(`Indexed ${index.length} records, ${issues.length} issues`);
 ```
 

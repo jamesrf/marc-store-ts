@@ -54,6 +54,18 @@ export function toFrozenRecord(record: MarcRecord): MarcRecord {
   return deepFreezeRecord({ ...record, fields: record.fields.map(copyField) });
 }
 
+const LEADER_ENCODER = new TextEncoder();
+
+function leaderLengthMatches(bytes: Uint8Array, length: number): boolean {
+  let n = 0;
+  for (let i = 0; i < 5; i++) {
+    const digit = bytes[i]! - 0x30;
+    if (digit < 0 || digit > 9) return false;
+    n = n * 10 + digit;
+  }
+  return n === length;
+}
+
 export class MarcBase implements ReadableStore {
   private readonly rawBuffer: ArrayBuffer;
   private readonly rawBufferOffset: number;
@@ -129,10 +141,7 @@ export class MarcBase implements ReadableStore {
     }
     let record: MarcRecord;
     try {
-      const parsed = parseMarcBinary(
-        new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length),
-        { strict: true }
-      );
+      const parsed = parseMarcBinary(this.recordBytes(index), { strict: true });
       if (parsed.length === 0) throw new Error('No record returned');
       record = deepFreezeRecord(parsed[0]!);
     } catch (e) {
@@ -159,6 +168,7 @@ export class MarcBase implements ReadableStore {
 
   /**
    * The record's original bytes, as a copy the caller may modify freely.
+   * If the leader length was wrong, it is corrected (see `scanBuffer`).
    * Use `iterateSerializedRecords()` for zero-copy access when writing out.
    */
   getSerializedRecord(index: number): Uint8Array {
@@ -168,24 +178,38 @@ export class MarcBase implements ReadableStore {
   /**
    * Zero-copy view of the record's original bytes. The view shares memory
    * with the store: writing to it corrupts the store, so treat it as read-only.
+   * If the leader length was wrong, this is instead a copy with it corrected.
    */
   getSerializedRecordView(index: number): Uint8Array {
     if (index < 0 || index >= this.recordIndex.length) {
       throw new RangeError(`Record index ${index} out of range [0, ${this.recordIndex.length})`);
     }
-    const { offset, length } = this.recordIndex[index]!;
-    return new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length);
+    return this.recordBytes(index);
   }
 
   /**
    * Yields each record's bytes as a zero-copy view into the store's buffer.
    * Treat the views as read-only; writing to them corrupts the store.
+   * Records whose leader length was wrong are yielded as corrected copies.
    */
   *iterateSerializedRecords(): Generator<Uint8Array> {
     for (let i = 0; i < this.recordIndex.length; i++) {
-      const { offset, length } = this.recordIndex[i]!;
-      yield new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length);
+      yield this.recordBytes(i);
     }
+  }
+
+  /**
+   * The record's bytes: a zero-copy view when the leader length matches the
+   * indexed length, otherwise a copy with the leader length corrected (the
+   * index, built from the record terminator, is the reliable boundary).
+   */
+  private recordBytes(index: number): Uint8Array {
+    const { offset, length } = this.recordIndex[index]!;
+    const bytes = new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length);
+    if (leaderLengthMatches(bytes, length) || length > 99999) return bytes;
+    const repaired = bytes.slice();
+    repaired.set(LEADER_ENCODER.encode(String(length).padStart(5, '0')), 0);
+    return repaired;
   }
 
   evictFromCache(index: number): void {

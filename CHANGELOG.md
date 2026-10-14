@@ -7,12 +7,12 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- `scanBuffer()` returns `{ index, issues, bytesConsumed }` so callers can detect a partially indexed file. Its `recover` option skips corrupt records by resynchronising on the next record terminator.
+- `scanBuffer()` returns `{ index, issues, bytesConsumed }` so callers can detect a partially indexed file.
 - `onError` option (`'throw'` | `'skip'` | callback) on `applyToAll`, `applyToMatching`, `deleteMatching`, `keepMatching`, `toMarcXml`, `toJson` and `SearchIndex.build`/`rebuild`, so one unparseable record no longer has to abort the whole operation. The default remains `'throw'`.
 - `iterateRecordResults(store)`, yielding a `RecordResult` per position instead of throwing.
 - `copyBuffer` option on `fromBuffer` (and the constructors' options) to isolate the store from later writes to the caller's buffer.
 - `MarcBase.getSerializedRecordView()` for explicit zero-copy access to a record's original bytes.
-- `MarcFile.fromBuffer` / `MarcBase.fromBuffer` accept an options object (`cacheCapacity`, `recover`, `onIssue`, `copyBuffer`) and expose `indexIssues`. A plain cache-capacity number is still accepted.
+- `MarcFile.fromBuffer` / `MarcBase.fromBuffer` accept an options object (`cacheCapacity`, `onIssue`, `copyBuffer`) and expose `indexIssues`. A plain cache-capacity number is still accepted.
 - `LICENSE` file (MIT) and full package metadata (`description`, `repository`, `homepage`, `bugs`, `keywords`).
 - `examples/generate-sample-data.ts` and an `npm run examples` script that runs every example in CI.
 
@@ -22,6 +22,7 @@ All notable changes to this project are documented here. The format is based on
 - The release workflow reuses the CI checks and publishes the exact tarball that passed them.
 
 ### Fixed
+- Records with a wrong leader length are now indexed by their 0x1D record terminator (reported as `length-mismatch`), parsed with the length corrected, and written out with a corrected leader. Previously one bad length made the record unparseable and stopped indexing, losing every record after it.
 - Docs: `revertRecord` was documented as restoring deleted records, which it cannot do; the README and JSDoc now say to use `revertAll()`. (Per-record restore of deletions is planned with stable record IDs.)
 - `getSerializedRecord()` now returns a copy. It previously returned a view into the store's buffer, so writing to the result corrupted the store. `iterateSerializedRecords()` still yields zero-copy views, now documented as read-only.
 - README: Node requirement, scripts list, `marc-ts` link and architecture description now match the code; unbenchmarked timing claims removed.

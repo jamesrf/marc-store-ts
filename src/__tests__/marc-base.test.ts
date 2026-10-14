@@ -396,3 +396,39 @@ describe('copyBuffer option', () => {
     expect(store.getRecord(1).fields[0]).toMatchObject({ tag: '001' });
   });
 });
+
+describe('leader length repair', () => {
+  function withWrongLeaderLength(): {
+    buffer: Uint8Array;
+    index: { offset: number; length: number }[];
+  } {
+    const buffer = createMultiRecordBuffer(2);
+    const index = indexBuffer(buffer);
+    buffer.set(new TextEncoder().encode('00999'), index[1]!.offset);
+    return { buffer, index };
+  }
+
+  it('parses a record whose leader length disagrees with a correct index entry', () => {
+    const { buffer, index } = withWrongLeaderLength();
+    const base = new MarcBase(buffer, index);
+    expect(base.getRecord(1).fields[0]).toMatchObject({ tag: '001' });
+  });
+
+  it('serializes it with the leader length corrected, leaving the buffer untouched', () => {
+    const { buffer, index } = withWrongLeaderLength();
+    const base = new MarcBase(buffer, index);
+    const expected = String(index[1]!.length).padStart(5, '0');
+    const decode = (b: Uint8Array) => new TextDecoder().decode(b.subarray(0, 5));
+    expect(decode(base.getSerializedRecord(1))).toBe(expected);
+    expect(decode(base.getSerializedRecordView(1))).toBe(expected);
+    expect(decode(Array.from(base.iterateSerializedRecords())[1]!)).toBe(expected);
+    expect(decode(buffer.subarray(index[1]!.offset))).toBe('00999');
+  });
+
+  it('still yields zero-copy views for records whose leader is correct', () => {
+    const { buffer, index } = withWrongLeaderLength();
+    const base = new MarcBase(buffer, index);
+    expect(base.getSerializedRecordView(0).buffer).toBe(buffer.buffer);
+    expect(base.getSerializedRecordView(1).buffer).not.toBe(buffer.buffer);
+  });
+});
