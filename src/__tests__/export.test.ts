@@ -3,7 +3,14 @@ import { serializeMarcBinary } from 'marc-ts';
 import type { MarcRecord } from 'marc-ts';
 import { serializeMarcJson } from 'marc-ts/json';
 import { MarcFile } from '../record-store.js';
-import { iterateMarcXml, toMarcXml, iterateJson, toJson } from '../export.js';
+import {
+  iterateMarcXml,
+  toMarcXml,
+  iterateJson,
+  toJson,
+  iterateMarcBinary,
+  toMarcBinary,
+} from '../export.js';
 import { indexBuffer } from '../record-index.js';
 import { createMultiRecordBuffer, createTypicalRecord } from './helpers/test-data.js';
 
@@ -140,4 +147,71 @@ describe('iterateJson / toJson', () => {
       expect(JSON.stringify(record).normalize('NFC')).toContain('Café résumé');
     }
   );
+});
+
+describe('iterateMarcBinary / toMarcBinary', () => {
+  it('converts MARC-8 records to UTF-8 by default', () => {
+    const store = mixedStore();
+    const output = toMarcBinary(store);
+    const reloaded = MarcFile.fromBuffer(output);
+    expect(reloaded.totalRecords).toBe(2);
+    for (const chunk of reloaded.iterateSerializedRecords()) {
+      expect(String.fromCharCode(chunk[9]!)).toBe('a');
+    }
+    expect(reloaded.getRecord(1).fields).toEqual(store.getRecord(1).fields);
+    expect(new TextDecoder().decode(output).normalize('NFC')).toContain('Café résumé');
+  });
+
+  it('passes UTF-8 records through byte for byte', () => {
+    const store = mixedStore();
+    const [first] = Array.from(iterateMarcBinary(store));
+    expect(first).toEqual(store.getSerializedRecord(0));
+    expect(first!.buffer).toBe(Array.from(store.iterateSerializedRecords())[0]!.buffer);
+  });
+
+  it("keeps the original bytes with encoding: 'preserve'", () => {
+    const store = mixedStore();
+    const original = Array.from(store.iterateSerializedRecords());
+    expect(Array.from(iterateMarcBinary(store, { encoding: 'preserve' }))).toEqual(original);
+    expect(String.fromCharCode(original[1]![9]!)).toBe(' ');
+  });
+
+  it('yields one chunk per record that joins to toMarcBinary', () => {
+    const store = mixedStore();
+    const chunks = Array.from(iterateMarcBinary(store));
+    expect(chunks).toHaveLength(2);
+    const joined = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+    let offset = 0;
+    for (const c of chunks) {
+      joined.set(c, offset);
+      offset += c.length;
+    }
+    expect(joined).toEqual(toMarcBinary(store));
+  });
+
+  it('applies onError to MARC-8 records that fail to parse', () => {
+    const good = serializeMarcBinary([marc8Record('a', 'One')], { encoding: 'marc8' });
+    const bad = serializeMarcBinary([marc8Record('b', 'Two')], { encoding: 'marc8' });
+    for (let i = 24; i < Math.min(50, bad.length - 1); i++) bad[i] = 0xff;
+    const buffer = new Uint8Array(good.length + bad.length);
+    buffer.set(good, 0);
+    buffer.set(bad, good.length);
+    const store = MarcFile.fromBuffer(buffer, { onIssue: () => {} });
+
+    expect(() => toMarcBinary(store)).toThrow(/Parse failed at index 1/);
+    expect(MarcFile.fromBuffer(toMarcBinary(store, { onError: 'skip' })).totalRecords).toBe(1);
+    const failures: number[] = [];
+    toMarcBinary(store, { onError: (position) => failures.push(position) });
+    expect(failures).toEqual([1]);
+    expect(toMarcBinary(store, { encoding: 'preserve' })).toEqual(buffer);
+  });
+
+  it('writes edited records from MARC-8 sources as UTF-8 in either mode', () => {
+    const store = mixedStore();
+    store.setRecord(1, marc8Record('m8', 'Edited'));
+    for (const encoding of ['utf8', 'preserve'] as const) {
+      const chunks = Array.from(iterateMarcBinary(store, { encoding }));
+      expect(String.fromCharCode(chunks[1]![9]!)).toBe('a');
+    }
+  });
 });

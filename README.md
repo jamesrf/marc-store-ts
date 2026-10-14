@@ -233,6 +233,8 @@ for (const { index, record } of store.iterateRecords()) {
 
 Serializes all records (modified and unmodified) for saving to a file.
 
+This yields each unmodified record's **original bytes**, including MARC-8 ones; use `iterateMarcBinary()` for UTF-8 output.
+
 **Zero-copy optimization**: Unmodified records yield Uint8Array views into the original buffer without re-parsing. These views share memory with the store, so treat them as read-only: writing to one corrupts the store. Records whose leader length was wrong (see [`scanBuffer()`](#scanbuffer)) are yielded as copies with the length corrected.
 
 ```typescript
@@ -467,7 +469,7 @@ By default, a record that cannot be parsed makes the whole operation throw. Ever
 | `'skip'` | Leave the record out and carry on |
 | `(position, error) => void` | Call the function, then skip the record |
 
-Skipped records are left untouched in the store: `applyToAll`/`applyToMatching` don't modify them, and `deleteMatching`/`keepMatching` keep them. `toMarcXml`/`toJson` omit them. `toMarcBinary` never parses unmodified records, so it writes them unchanged regardless.
+Skipped records are left untouched in the store: `applyToAll`/`applyToMatching` don't modify them, and `deleteMatching`/`keepMatching` keep them. `toMarcXml`/`toJson` omit them. `toMarcBinary` doesn't parse unmodified UTF-8 records, so it writes them unchanged whatever the option; it only parses (and applies `onError` to) records it is converting from MARC-8, and with `encoding: 'preserve'` it parses nothing.
 
 ```typescript
 const failures: number[] = [];
@@ -572,16 +574,22 @@ writeFileSync('filtered.mrc', toMarcBinary(store));
 
 All export functions return a value — you write it to disk yourself.
 
-#### `toMarcBinary(store)` — MARC21 binary (`.mrc`)
+#### `toMarcBinary(store, options?)` — MARC21 binary (`.mrc`)
 
 ```typescript
 import { writeFileSync } from 'fs';
 import { toMarcBinary } from 'marc-store-ts';
 
 writeFileSync('output.mrc', toMarcBinary(store));
+writeFileSync('output.mrc', toMarcBinary(store, { encoding: 'preserve' }));   // keep MARC-8 bytes
 ```
 
-Unmodified records are zero-copied from the original buffer, so this is fast even for large files.
+The output is UTF-8 throughout. Unmodified UTF-8 records are copied straight from the original buffer without parsing, so this is fast even for large files. Records that were MARC-8 in the source file are parsed and rewritten as UTF-8; see [Character encoding](#character-encoding).
+
+| Option | Default | |
+|---|---|---|
+| `encoding` | `'utf8'` | `'utf8'` converts MARC-8 records; `'preserve'` writes every unmodified record's original bytes |
+| `onError` | `'throw'` | What to do with a MARC-8 record that fails to parse during conversion (`'preserve'` never parses) |
 
 #### `toMarcXml(store, options?)` — MARCXML (`.xml`)
 
@@ -643,25 +651,28 @@ By default each record is written in the community-standard [MARC-in-JSON](https
 
 #### Streaming large exports
 
-`toMarcXml` and `toJson` build the whole output as one string, which can exceed JavaScript's string length limit for very large files. `iterateMarcXml(store, options?)` and `iterateJson(store, options?)` take the same options but yield the output in chunks (one per record), so you can stream it to disk:
+`toMarcXml` and `toJson` build the whole output as one string, which can exceed JavaScript's string length limit for very large files. `iterateMarcXml(store, options?)`, `iterateJson(store, options?)` and `iterateMarcBinary(store, options?)` take the same options as their `to…` counterparts but yield the output in chunks (one per record), so you can stream it to disk:
 
 ```typescript
 import { createWriteStream } from 'fs';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
-import { iterateMarcXml, iterateJson } from 'marc-store-ts';
+import { iterateMarcBinary, iterateMarcXml, iterateJson } from 'marc-store-ts';
 
+await pipeline(Readable.from(iterateMarcBinary(store)), createWriteStream('output.mrc'));
 await pipeline(Readable.from(iterateMarcXml(store)), createWriteStream('output.xml'));
 await pipeline(Readable.from(iterateJson(store, { ndjson: true })), createWriteStream('output.ndjson'));
 ```
 
-Joined, the chunks are exactly what `toMarcXml` / `toJson` return.
+Joined, the chunks are exactly what the matching `to…` function returns.
 
 #### Character encoding
 
 MARC records are either MARC-8 (leader/09 is a space) or UTF-8 (leader/09 is `a`). `marc-ts` converts MARC-8 text to Unicode when it parses a record, so every record you read from the store holds Unicode strings. Accented characters from MARC-8 come out decomposed (a base letter followed by a combining accent, Unicode NFD); call `.normalize('NFC')` if you need composed characters.
 
 The XML and JSON exports are always Unicode, so they set leader/09 to `a` for records that were MARC-8 in the source file.
+
+`toMarcBinary` also writes UTF-8 by default: unmodified MARC-8 records are parsed and re-serialized as UTF-8, so a file never mixes encodings. Edited and inserted records are always written as UTF-8. Pass `encoding: 'preserve'` to keep unmodified records' original bytes instead (faster, and byte-for-byte, but MARC-8 records stay MARC-8). `store.iterateSerializedRecords()` always yields the original bytes and never converts.
 
 ### Putting it together
 

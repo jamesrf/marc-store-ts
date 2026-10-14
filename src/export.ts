@@ -1,20 +1,66 @@
-import { isControlField, isDataField } from 'marc-ts';
+import { isControlField, isDataField, serializeMarcBinary } from 'marc-ts';
 import type { MarcRecord } from 'marc-ts';
 import { serializeMarcJson } from 'marc-ts/json';
 import type { ReadableStore } from './types.js';
 import { iterateReadableRecords } from './iterate.js';
 import type { RecordErrorOptions } from './iterate.js';
 
+const MARC8_LEADER_BYTE = 0x20; // leader/09: ' ' = MARC-8, 'a' = UTF-8
+
+export interface ToMarcBinaryOptions extends RecordErrorOptions {
+  /**
+   * - `'utf8'` (default): records stored as MARC-8 are parsed and rewritten
+   *   as UTF-8 (leader/09 = `a`), so the whole output is UTF-8.
+   * - `'preserve'`: unmodified records keep their original bytes, whatever
+   *   their encoding. Edited and inserted records are always UTF-8.
+   */
+  encoding?: 'utf8' | 'preserve';
+}
+
 /**
- * Serialize all records in the store to a single MARC21 binary buffer.
- * Unmodified records are copied byte-for-byte from the original buffer
- * without being parsed, so records that would fail to parse are still
- * written unchanged.
+ * Serialize all records in the store to MARC21 binary, one record per chunk.
+ * Use it to stream large files to disk; joined, the chunks equal
+ * `toMarcBinary(store, options)`.
+ *
+ * Unmodified UTF-8 records are yielded straight from the original buffer
+ * without being parsed (zero-copy). With the default `encoding: 'utf8'`,
+ * unmodified MARC-8 records are parsed and re-serialized as UTF-8; one that
+ * fails to parse is handled per `options.onError` (the default `'throw'`
+ * stops; `'skip'` or a callback leaves it out). With `'preserve'`, nothing
+ * is parsed and every unmodified record is written as-is.
  */
-export function toMarcBinary(store: ReadableStore): Uint8Array {
+export function* iterateMarcBinary(
+  store: ReadableStore,
+  options: ToMarcBinaryOptions = {}
+): Generator<Uint8Array> {
+  const { encoding = 'utf8', onError = 'throw' } = options;
+  let position = 0;
+  for (const chunk of store.iterateSerializedRecords()) {
+    const current = position++;
+    if (encoding === 'preserve' || chunk[9] !== MARC8_LEADER_BYTE) {
+      yield chunk;
+      continue;
+    }
+    const result = store.tryGetRecord(current);
+    if (result.ok) {
+      yield serializeMarcBinary([result.record]); // marc-ts writes UTF-8 by default
+    } else if (onError === 'throw') {
+      throw new Error(result.error);
+    } else if (typeof onError === 'function') {
+      onError(current, result.error);
+    }
+  }
+}
+
+/**
+ * Serialize all records in the store to a single MARC21 binary buffer,
+ * converting MARC-8 records to UTF-8 by default (see `ToMarcBinaryOptions`).
+ * See `iterateMarcBinary` to stream the output instead.
+ */
+export function toMarcBinary(store: ReadableStore, options?: ToMarcBinaryOptions): Uint8Array {
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for (const chunk of store.iterateSerializedRecords()) {
+  for (const chunk of iterateMarcBinary(store, options)) {
     chunks.push(chunk);
     total += chunk.length;
   }

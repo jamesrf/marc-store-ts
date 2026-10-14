@@ -7,11 +7,12 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Breaking
+- `toMarcBinary` converts records stored as MARC-8 to UTF-8 by default, so its output never mixes encodings. Pass `{ encoding: 'preserve' }` for the previous byte-for-byte behaviour.
 - `toJson` now writes MARC-in-JSON by default. The previous shape is available as `toJson(store, { format: 'simple' })`.
 - `toMarcXml`'s `encoding` option is removed. It only changed the XML declaration, never the output, which is always UTF-8.
 
 ### Added
-- `iterateMarcXml(store)` and `iterateJson(store)` stream exports one chunk per record, for files too large to build as a single string.
+- `iterateMarcBinary(store)`, `iterateMarcXml(store)` and `iterateJson(store)` stream exports one chunk per record, for files too large to build as a single string.
 - `toJson` options `format: 'marc-in-json' | 'simple'` and `ndjson`.
 - `getSlot(position)` and `iterateSlots()` on `MarcFile` and `EditLayer`.
 - Stable record IDs: `idAt(position)`, `positionOf(id)`, `getRecordById(id)`, `revert(id)` and `deletedIds()` on `MarcFile` and `EditLayer` (`MarcBase` has `idAt`/`positionOf`, where ID equals index), plus the `RecordId` type and `IdentifiedStore` interface. IDs don't change when other records move and are never reused. `revert(id)` can undo a deletion, which `revertRecord(position)` cannot.
@@ -37,6 +38,7 @@ All notable changes to this project are documented here. The format is based on
 - The release workflow reuses the CI checks and publishes the exact tarball that passed them.
 
 ### Fixed
+- `toMarcBinary` could write a file mixing MARC-8 (unedited records) and UTF-8 (edited records).
 - XML and JSON exports labelled records from MARC-8 source files as MARC-8 (leader/09 = space) although their text is Unicode; leader/09 is now `a`.
 - `SearchIndex` results pointed at the wrong record (or past the end) after any insert or delete until the index was rebuilt.
 - `deleteMatching` / `keepMatching` were quadratic (each delete rebuilt the position map): 4.7 s for 50K records. They now use `deleteRecords` and take 0.18 s, scaling linearly.

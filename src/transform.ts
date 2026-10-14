@@ -91,5 +91,12 @@ export function keepMatching(
   return deleteMatching(store, (record) => !predicate(record), options);
 }
 
-export { toMarcBinary, toMarcXml, toJson, iterateMarcXml, iterateJson } from './export.js';
-export type { ToMarcXmlOptions, ToJsonOptions } from './export.js';
+export {
+  toMarcBinary,
+  toMarcXml,
+  toJson,
+  iterateMarcBinary,
+  iterateMarcXml,
+  iterateJson,
+} from './export.js';
+export type { ToMarcBinaryOptions, ToMarcXmlOptions, ToJsonOptions } from './export.js';
