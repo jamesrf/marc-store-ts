@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Breaking
+- `SearchIndex` default fields: `author` now takes $a from 700/710/711/720 only, rather than every 7XX field (which included linking entries such as 776). `contents` no longer repeats the subfields that `title`, `author` and `subjects` index, so relevance scores change. `DEFAULT_SEARCH_FIELDS` is frozen; build a new array to customize it.
 - Indexing problems are no longer logged with `console.warn`. They're returned by `scanBuffer`, exposed as `indexIssues` by `fromBuffer`, and passed to the `onIssue` callback if you supply one (`onIssue: (i) => console.warn(i.message)` restores the old logging).
 - The `slots` getter on `MarcFile`/`EditLayer` is removed: it copied every slot on each access. Use `getSlot(position)` or `iterateSlots()`.
 - `SearchIndex.rebuild()` is removed; it was an alias for `build()`.
@@ -19,6 +20,7 @@ All notable changes to this project are documented here. The format is based on
 - `toMarcXml`'s `encoding` option is removed. It only changed the XML declaration, never the output, which is always UTF-8.
 
 ### Added
+- Per-query options for `SearchIndex.search(query, options)`: `limit`, `fields`, `combineWith`, `fuzzy`, `prefix`, `boost` and `filter`. A number is still accepted as the limit.
 - `iterateMarcBinary(store)`, `iterateMarcXml(store)` and `iterateJson(store)` stream exports one chunk per record, for files too large to build as a single string.
 - `toJson` options `format: 'marc-in-json' | 'simple'` and `ndjson`.
 - `getSlot(position)` and `iterateSlots()` on `MarcFile` and `EditLayer`.

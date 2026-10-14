@@ -163,7 +163,66 @@ describe('DEFAULT_SEARCH_FIELDS', () => {
     expect(titleField!.extract(catcherRecord)).toEqual(['The Catcher in the Rye']);
     expect(authorField!.extract(catcherRecord)).toEqual(['Salinger, J. D.']);
     expect(subjectsField!.extract(catcherRecord)).toEqual(['Teenagers -- Fiction']);
-    expect(contentsField!.extract(catcherRecord)).toContain('The Catcher in the Rye');
+    // contents doesn't repeat what title/author/subjects already index
+    expect(contentsField!.extract(catcherRecord)).toEqual([]);
+  });
+
+  it('is frozen', () => {
+    expect(Object.isFrozen(DEFAULT_SEARCH_FIELDS)).toBe(true);
+    expect(DEFAULT_SEARCH_FIELDS.every((f) => Object.isFrozen(f))).toBe(true);
+    expect(() => (DEFAULT_SEARCH_FIELDS as unknown as unknown[]).push({})).toThrow(TypeError);
+  });
+
+  it('indexes added entries 700/710/711/720 as authors, but not linking entries', () => {
+    const record = recordWith([
+      {
+        tag: '700',
+        indicator1: '1',
+        indicator2: ' ',
+        subfields: [{ code: 'a', value: 'Coauthor, A.' }],
+      },
+      {
+        tag: '711',
+        indicator1: '2',
+        indicator2: ' ',
+        subfields: [{ code: 'a', value: 'Meeting' }],
+      },
+      {
+        tag: '776',
+        indicator1: '0',
+        indicator2: '8',
+        subfields: [{ code: 'a', value: 'Linked, L.' }],
+      },
+    ]);
+    const [, authorField, , contentsField] = DEFAULT_SEARCH_FIELDS;
+    expect(authorField!.extract(record)).toEqual(['Coauthor, A.', 'Meeting']);
+    expect(contentsField!.extract(record)).toEqual(['Linked, L.']);
+  });
+
+  it('keeps subfields the named fields skip in contents', () => {
+    const record = recordWith([
+      {
+        tag: '245',
+        indicator1: '1',
+        indicator2: '0',
+        subfields: [
+          { code: 'a', value: 'Title' },
+          { code: 'c', value: 'by Someone' },
+        ],
+      },
+      {
+        tag: '650',
+        indicator1: ' ',
+        indicator2: '0',
+        subfields: [
+          { code: 'a', value: 'Whales' },
+          { code: 'z', value: 'Pacific' },
+        ],
+      },
+      { tag: '500', indicator1: ' ', indicator2: ' ', subfields: [{ code: 'a', value: 'A note' }] },
+    ]);
+    const contentsField = DEFAULT_SEARCH_FIELDS[3]!;
+    expect(contentsField.extract(record)).toEqual(['by Someone', 'Pacific', 'A note']);
   });
 
   it('returns an empty array for fields absent from a record', () => {
@@ -260,5 +319,48 @@ describe('SearchIndex with edits after build', () => {
     const index = new SearchIndex();
     index.build(plain);
     expect(index.search('melville')).toMatchObject([{ id: 1, position: 1 }]);
+  });
+});
+
+describe('SearchIndex.search options', () => {
+  const store = () => MarcFile.fromBuffer(bufferFrom([catcherRecord, mobyDickRecord]));
+  const built = () => {
+    const s = store();
+    const index = new SearchIndex();
+    index.build(s);
+    return { s, index };
+  };
+
+  it('still accepts a number as the limit', () => {
+    const { index } = built();
+    expect(index.search('fiction', 1)).toHaveLength(1);
+    expect(index.search('fiction', { limit: 1 })).toHaveLength(1);
+  });
+
+  it('restricts the search to the given fields', () => {
+    const { index } = built();
+    expect(index.search('melville', { fields: ['title'] })).toEqual([]);
+    expect(index.search('melville', { fields: ['author'] }).map((r) => r.id)).toEqual([1]);
+  });
+
+  it('combines terms with AND when asked', () => {
+    const { index } = built();
+    expect(index.search('whaling teenagers').length).toBe(2);
+    expect(index.search('whaling teenagers', { combineWith: 'AND' })).toEqual([]);
+  });
+
+  it('can turn off fuzzy and prefix matching per query', () => {
+    const { index } = built();
+    expect(index.search('melvile').length).toBeGreaterThan(0);
+    expect(index.search('melvile', { fuzzy: false, prefix: false })).toEqual([]);
+  });
+
+  it('applies filter to current positions before the limit', () => {
+    const { s, index } = built();
+    s.insertRecord(catcherRecord, 0);
+    index.add(s.idAt(1), s.getRecord(1));
+    const results = index.search('fiction', { filter: (r) => r.position > 0, limit: 1 });
+    expect(results).toHaveLength(1);
+    expect(results[0]!.position).toBeGreaterThan(0);
   });
 });

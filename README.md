@@ -377,11 +377,32 @@ By default, `SearchIndex` indexes four fields extracted with `marc-ts` helpers:
 | Field | Source |
 |---|---|
 | `title` | 245 $a/$b |
-| `author` | 100/110 $a (main entry) and 700 $a (added entries) |
+| `author` | 100/110 $a (main entry) and 700/710/711/720 $a (added entries) |
 | `subjects` | 6XX $a |
-| `contents` | every subfield value, for general recall |
+| `contents` | every other subfield (e.g. 245 $c, subject subdivisions, notes, linking entries), for general recall |
 
-Titles and subjects are boosted higher than general contents by default (configurable via `boost`).
+`contents` leaves out what the other three fields already index, so a record isn't indexed twice. Titles and subjects are boosted higher than general contents by default (configurable via `boost`).
+
+`DEFAULT_SEARCH_FIELDS` is frozen. To customize it, build a new array, e.g. `[...DEFAULT_SEARCH_FIELDS, myExtractor]` or `DEFAULT_SEARCH_FIELDS.filter((f) => f.name !== 'contents')`.
+
+### Query options
+
+`search(query, options?)` takes per-query options (or a number, as shorthand for `{ limit }`). Unset options fall back to the index's defaults.
+
+```typescript
+index.search('melville', { fields: ['author'] });                  // only search some fields
+index.search('whaling pacific', { combineWith: 'AND' });           // require every term
+index.search('melville', { fuzzy: false, prefix: false });         // exact terms only
+index.search('fiction', { limit: 20, filter: (r) => store.isModified(r.position) });
+```
+
+| Option | |
+|---|---|
+| `limit` | Maximum results, counted after `filter` and after deleted records are left out |
+| `fields` | Only search these named fields |
+| `combineWith` | `'OR'` (default), `'AND'` or `'AND_NOT'` |
+| `fuzzy`, `prefix`, `boost` | Override the index's matching and relevance settings for this query |
+| `filter` | `(result) => boolean`; sees each result's current `position` |
 
 ### Keeping the index in sync after edits
 
@@ -438,7 +459,7 @@ isbnIndex.build(store);
 
 ```typescript
 interface SearchIndexOptions {
-  fields?: SearchFieldExtractor[];    // defaults to DEFAULT_SEARCH_FIELDS
+  fields?: readonly SearchFieldExtractor[];  // defaults to DEFAULT_SEARCH_FIELDS
   boost?: Record<string, number>;     // per-field relevance boost
   fuzzy?: number | boolean;           // default 0.2
   prefix?: boolean;                   // default true

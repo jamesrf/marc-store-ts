@@ -1,6 +1,6 @@
 import MiniSearch from 'minisearch';
 import type { SearchOptions } from 'minisearch';
-import { getFieldsByPattern, isDataField, subjects, title, author } from 'marc-ts';
+import { isDataField, subjects, title, author } from 'marc-ts';
 import type { MarcRecord } from 'marc-ts';
 import type { IdentifiedStore, ReadableStore, RecordId } from './types.js';
 import { iterateReadableRecords } from './iterate.js';
@@ -19,7 +19,7 @@ export interface SearchFieldExtractor {
 
 export interface SearchIndexOptions {
   /** Field extractors to run over every record. Defaults to DEFAULT_SEARCH_FIELDS. */
-  fields?: SearchFieldExtractor[];
+  fields?: readonly SearchFieldExtractor[];
   /** Per-field relevance boosts (default: title 2, author 1.5, subjects 1.5, contents 1). */
   boost?: Record<string, number>;
   /** MiniSearch fuzzy-match option (0/false disables fuzzy matching). Default 0.2. */
@@ -41,50 +41,91 @@ export interface SearchResultItem {
   match: Record<string, string[]>;
 }
 
+/** Per-query options for `SearchIndex.search`; unset options use the index's defaults. */
+export interface SearchQueryOptions {
+  /** Maximum number of results, counted after `filter` and after deleted records are left out. */
+  limit?: number;
+  /** Only search these named fields (e.g. `['title']`). Default: all indexed fields. */
+  fields?: string[];
+  /** How multiple query terms combine. Default `'OR'`. */
+  combineWith?: 'OR' | 'AND' | 'AND_NOT';
+  /** Fuzzy matching for this query (0/false disables it). */
+  fuzzy?: number | boolean;
+  /** Prefix matching for this query. */
+  prefix?: boolean;
+  /** Per-field relevance boosts for this query. */
+  boost?: Record<string, number>;
+  /** Keep only results for which this returns true (it sees the current `position`). */
+  filter?: (item: SearchResultItem) => boolean;
+}
+
 interface IndexedDocument {
   id: number;
   [fieldName: string]: unknown;
 }
 
+const ADDED_ENTRY_TAGS = new Set(['700', '710', '711', '720']);
+
+/** True for subfields that the title, author or subjects extractors already index. */
+function isInNamedDefaultField(tag: string, code: string): boolean {
+  if (tag === '245') return code === 'a' || code === 'b'; // title()
+  if (tag === '100' || tag === '110') return code === 'a'; // author()
+  if (ADDED_ENTRY_TAGS.has(tag)) return code === 'a';
+  return tag.startsWith('6') && code === 'a'; // subjects()
+}
+
 /**
- * Default field extractors: title (245), author (1xx main entry + 7xx added
- * entries), subjects (6xx), and a catch-all "contents" field over every data
- * field subfield for general recall.
+ * Default field extractors (frozen; build a new array to customize):
+ * - `title`: 245 $a $b
+ * - `author`: main entry (100/110 $a) and personal/corporate/meeting/
+ *   uncontrolled added entries (700/710/711/720 $a)
+ * - `subjects`: 6XX $a
+ * - `contents`: every other data-field subfield (e.g. 245 $c, subject
+ *   subdivisions, notes, linking entries), for general recall without
+ *   indexing the named fields twice
  */
-export const DEFAULT_SEARCH_FIELDS: SearchFieldExtractor[] = [
-  {
-    name: 'title',
-    extract: (record) => {
-      const t = title(record);
-      return t ? [t] : [];
+export const DEFAULT_SEARCH_FIELDS: readonly SearchFieldExtractor[] = Object.freeze(
+  [
+    {
+      name: 'title',
+      extract: (record: MarcRecord) => {
+        const t = title(record);
+        return t ? [t] : [];
+      },
     },
-  },
-  {
-    name: 'author',
-    extract: (record) => {
-      const values: string[] = [];
-      const main = author(record);
-      if (main) values.push(main);
-      for (const field of getFieldsByPattern(record, '7XX')) {
-        if (isDataField(field)) {
-          for (const sub of field.subfields) {
-            if (sub.code === 'a') values.push(sub.value);
+    {
+      name: 'author',
+      extract: (record: MarcRecord) => {
+        const values: string[] = [];
+        const main = author(record);
+        if (main) values.push(main);
+        for (const field of record.fields) {
+          if (isDataField(field) && ADDED_ENTRY_TAGS.has(field.tag)) {
+            for (const sub of field.subfields) {
+              if (sub.code === 'a') values.push(sub.value);
+            }
           }
         }
-      }
-      return values;
+        return values;
+      },
     },
-  },
-  {
-    name: 'subjects',
-    extract: (record) => subjects(record),
-  },
-  {
-    name: 'contents',
-    extract: (record) =>
-      record.fields.filter(isDataField).flatMap((field) => field.subfields.map((sub) => sub.value)),
-  },
-];
+    {
+      name: 'subjects',
+      extract: (record: MarcRecord) => subjects(record),
+    },
+    {
+      name: 'contents',
+      extract: (record: MarcRecord) =>
+        record.fields
+          .filter(isDataField)
+          .flatMap((field) =>
+            field.subfields
+              .filter((sub) => !isInNamedDefaultField(field.tag, sub.code))
+              .map((sub) => sub.value)
+          ),
+    },
+  ].map((extractor) => Object.freeze(extractor))
+);
 
 const DEFAULT_BOOST: Record<string, number> = { title: 2, author: 1.5, subjects: 1.5, contents: 1 };
 
@@ -111,7 +152,7 @@ function hasIds(store: ReadableStore): store is ReadableStore & IdentifiedStore 
  * indexes (e.g. a subjects-only index and a title/author-only index).
  */
 export class SearchIndex {
-  private readonly fields: SearchFieldExtractor[];
+  private readonly fields: readonly SearchFieldExtractor[];
   private readonly searchOptions: SearchOptions;
   private readonly tokenize?: (text: string, fieldName?: string) => string[];
   private readonly processTerm?: (
@@ -210,20 +251,31 @@ export class SearchIndex {
    * Each result has the record's stable `id` and its current `position`
    * (feed it to `store.getRecord(position)`). Records deleted from the store
    * since the index was built are left out.
+   *
+   * @param options - Per-query options (see `SearchQueryOptions`), or a
+   *   number as shorthand for `{ limit }`
    */
-  search(query: string, limit?: number): SearchResultItem[] {
+  search(query: string, options: number | SearchQueryOptions = {}): SearchResultItem[] {
+    const { limit, filter, ...queryOptions } =
+      typeof options === 'number' ? { limit: options } : options;
+    // Only pass options that are set, so MiniSearch keeps its defaults for the rest.
+    const searchOptions = Object.fromEntries(
+      Object.entries(queryOptions).filter(([, value]) => value !== undefined)
+    ) as SearchOptions;
     const store = this.store;
     const positionOf =
       store !== null && hasIds(store)
         ? (id: RecordId) => store.positionOf(id)
         : (id: RecordId) => id;
     const items: SearchResultItem[] = [];
-    for (const r of this.mini.search(query)) {
+    for (const r of this.mini.search(query, searchOptions)) {
       if (limit !== undefined && items.length >= limit) break;
       const id = r.id as RecordId;
       const position = positionOf(id);
       if (position === undefined) continue;
-      items.push({ id, position, score: r.score, match: r.match });
+      const item = { id, position, score: r.score, match: r.match };
+      if (filter && !filter(item)) continue;
+      items.push(item);
     }
     return items;
   }
