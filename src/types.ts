@@ -32,11 +32,19 @@ export interface EditableStore extends ReadableStore {
 export interface StoreOptions {
   /** Issues found while indexing the buffer, exposed as `indexIssues`. */
   indexIssues?: readonly IndexIssue[];
+  /**
+   * Copy the buffer instead of keeping a reference to the caller's memory, so
+   * later writes to that memory cannot change the store. Doubles peak memory
+   * while loading. Default false.
+   */
+  copyBuffer?: boolean;
 }
 
 export interface FromBufferOptions extends ScanOptions {
   /** Maximum number of parsed records kept in the LRU cache. Default 200. */
   cacheCapacity?: number;
+  /** See `StoreOptions.copyBuffer`. */
+  copyBuffer?: boolean;
 }
 
 /** Accepts the legacy `cacheCapacity` number or an options object. */

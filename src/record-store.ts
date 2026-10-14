@@ -36,12 +36,17 @@ export class MarcFile {
     buffer: Uint8Array | ArrayBuffer,
     options?: number | FromBufferOptions
   ): MarcFile {
-    const { cacheCapacity = 200, onIssue, ...scanOptions } = normalizeFromBufferOptions(options);
+    const {
+      cacheCapacity = 200,
+      copyBuffer,
+      onIssue,
+      ...scanOptions
+    } = normalizeFromBufferOptions(options);
     const { index, issues } = scanBuffer(buffer, {
       ...scanOptions,
       onIssue: onIssue ?? ((issue) => console.warn(issue.message)),
     });
-    return new MarcFile(buffer, index, cacheCapacity, { indexIssues: issues });
+    return new MarcFile(buffer, index, cacheCapacity, { indexIssues: issues, copyBuffer });
   }
 
   /** Problems found while indexing the buffer; see `scanBuffer`. */

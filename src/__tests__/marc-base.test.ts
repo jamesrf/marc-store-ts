@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MarcBase, deepFreezeRecord } from '../marc-base.js';
 import { indexBuffer } from '../record-index.js';
+import { MarcFile } from '../record-store.js';
 import { createMultiRecordBuffer, createTypicalRecord } from './helpers/test-data.js';
 
 describe('deepFreezeRecord', () => {
@@ -257,13 +258,24 @@ describe('MarcBase', () => {
   });
 
   describe('getSerializedRecord', () => {
-    it('returns a Uint8Array view into the underlying buffer', () => {
+    it('returns a copy, so writing to it cannot corrupt the store', () => {
       const buffer = createMultiRecordBuffer(3);
       const base = MarcBase.fromBuffer(buffer);
       const serialized = base.getSerializedRecord(0);
       expect(serialized).toBeInstanceOf(Uint8Array);
-      // Zero-copy: the backing ArrayBuffer is the same
-      expect(serialized.buffer).toBe(buffer.buffer);
+      expect(serialized.buffer).not.toBe(buffer.buffer);
+      const leader = base.getRecord(0).leader;
+      serialized.fill(0xff);
+      base.evictFromCache(0);
+      expect(base.getRecord(0).leader).toBe(leader);
+    });
+
+    it('getSerializedRecordView returns a zero-copy view', () => {
+      const buffer = createMultiRecordBuffer(3);
+      const base = MarcBase.fromBuffer(buffer);
+      const view = base.getSerializedRecordView(0);
+      expect(view.buffer).toBe(buffer.buffer);
+      expect(view).toEqual(base.getSerializedRecord(0));
     });
 
     it('throws RangeError for negative index', () => {
@@ -344,5 +356,43 @@ describe('MarcBase', () => {
       base.evictFromCache(0);
       expect(base.getRecord(1)).toBe(r1);
     });
+  });
+});
+
+describe('copyBuffer option', () => {
+  it('shares the caller buffer by default', () => {
+    const buffer = createMultiRecordBuffer(2);
+    const base = MarcBase.fromBuffer(buffer);
+    expect(base.getSerializedRecordView(0).buffer).toBe(buffer.buffer);
+  });
+
+  it('isolates the store from later writes to the caller buffer', () => {
+    const buffer = createMultiRecordBuffer(2);
+    const original = buffer.slice();
+    const base = MarcBase.fromBuffer(buffer, { copyBuffer: true });
+    buffer.fill(0xff);
+    expect(base.getSerializedRecordView(0).buffer).not.toBe(buffer.buffer);
+    expect(Array.from(base.iterateSerializedRecords()).flatMap((c) => Array.from(c))).toEqual(
+      Array.from(original)
+    );
+  });
+
+  it('copies only the viewed bytes of a Uint8Array subarray', () => {
+    const records = createMultiRecordBuffer(3);
+    const padded = new Uint8Array(records.length + 10);
+    padded.set(records, 10);
+    const sub = padded.subarray(10);
+    const base = new MarcBase(sub, indexBuffer(sub), 200, { copyBuffer: true });
+    const view = base.getSerializedRecordView(1);
+    expect(view.buffer).not.toBe(padded.buffer);
+    expect(view.buffer.byteLength).toBe(records.length);
+    expect(base.getRecord(2).fields[0]).toMatchObject({ tag: '001' });
+  });
+
+  it('is accepted by MarcFile.fromBuffer', () => {
+    const buffer = createMultiRecordBuffer(2);
+    const store = MarcFile.fromBuffer(buffer, { copyBuffer: true });
+    buffer.fill(0xff);
+    expect(store.getRecord(1).fields[0]).toMatchObject({ tag: '001' });
   });
 });

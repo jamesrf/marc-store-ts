@@ -158,6 +158,11 @@ export class EditLayer implements EditableStore {
 
   // ========== Serialization ==========
 
+  /**
+   * The record's bytes as a new array the caller may modify freely: a copy of
+   * the original bytes for an unmodified record, or a fresh serialization for
+   * an edited/inserted one.
+   */
   getSerializedRecord(position: number): Uint8Array {
     const slot = this._slotAt(position);
     if (slot === undefined) {
@@ -172,11 +177,15 @@ export class EditLayer implements EditableStore {
     throw new RangeError(`Record index ${position} is deleted`);
   }
 
+  /**
+   * Yields every active record's bytes. Unmodified records are zero-copy
+   * views into the store's buffer: treat them as read-only.
+   */
   *iterateSerializedRecords(): Generator<Uint8Array> {
     for (const slot of this._slots) {
       if (slot.kind === 'deleted') continue;
       if (slot.kind === 'original') {
-        yield this.base.getSerializedRecord(slot.index);
+        yield this.base.getSerializedRecordView(slot.index);
       } else {
         yield serializeMarcBinary([slot.record]);
       }

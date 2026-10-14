@@ -81,10 +81,13 @@ interface FromBufferOptions {
   cacheCapacity?: number;                  // LRU cache size (default 200)
   recover?: boolean;                       // skip corrupt records instead of stopping (default false)
   onIssue?: (issue: IndexIssue) => void;   // replaces the default console.warn
+  copyBuffer?: boolean;                    // copy the buffer instead of referencing it (default false)
 }
 ```
 
 Convenience factory — indexes the buffer with [`scanBuffer()`](#scanbuffer) and constructs the store in one call. A plain number is still accepted as the cache capacity.
+
+By default the store keeps a reference to your buffer rather than copying it, so **don't write to the buffer after creating the store**. Pass `copyBuffer: true` if you need to reuse that memory; it doubles peak memory while loading.
 
 Any indexing problems are available afterwards as `store.indexIssues`. **If it is non-empty, the file may be only partially indexed**, and exporting the store would drop the unindexed records:
 
@@ -198,7 +201,7 @@ store.insertRecord(newRecord, 3);            // insert after position 3
 
 ##### getSerializedRecord(index: number): Uint8Array
 
-Returns the serialized binary representation of a single record. For unmodified records this is a zero-copy view into the original buffer.
+Returns the serialized binary representation of a single record, as a new `Uint8Array` you may modify freely (a copy of the original bytes for an unmodified record). For zero-copy access when writing a file, use `iterateSerializedRecords()`.
 
 ```typescript
 const bytes = store.getSerializedRecord(0);
@@ -218,7 +221,7 @@ for (const { index, record } of store.iterateRecords()) {
 
 Serializes all records (modified and unmodified) for saving to a file.
 
-**Zero-copy optimization**: Unmodified records yield Uint8Array views into the original buffer without re-parsing.
+**Zero-copy optimization**: Unmodified records yield Uint8Array views into the original buffer without re-parsing. These views share memory with the store, so treat them as read-only: writing to one corrupts the store.
 
 ```typescript
 import { writeFileSync } from 'fs';

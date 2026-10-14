@@ -500,12 +500,13 @@ describe('EditLayer', () => {
   });
 
   describe('getSerializedRecord', () => {
-    it('returns a zero-copy view for an original slot', () => {
+    it('returns a copy of the original bytes for an original slot', () => {
       const buffer = createMultiRecordBuffer(3);
       const base = MarcBase.fromBuffer(buffer);
       const layer = new EditLayer(base);
       const serialized = layer.getSerializedRecord(0);
-      expect(serialized.buffer).toBe(buffer.buffer);
+      expect(serialized.buffer).not.toBe(buffer.buffer);
+      expect(serialized).toEqual(base.getSerializedRecordView(0));
     });
 
     it('returns re-serialized bytes for a modified slot', () => {

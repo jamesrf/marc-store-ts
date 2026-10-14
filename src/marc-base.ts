@@ -68,7 +68,11 @@ export class MarcBase implements ReadableStore {
     cacheCapacity = 200,
     options: StoreOptions = {}
   ) {
-    if (rawBuffer instanceof Uint8Array) {
+    if (options.copyBuffer) {
+      const bytes = rawBuffer instanceof Uint8Array ? rawBuffer : new Uint8Array(rawBuffer);
+      this.rawBuffer = bytes.slice().buffer;
+      this.rawBufferOffset = 0;
+    } else if (rawBuffer instanceof Uint8Array) {
       this.rawBuffer = rawBuffer.buffer as ArrayBuffer;
       this.rawBufferOffset = rawBuffer.byteOffset;
     } else {
@@ -91,12 +95,17 @@ export class MarcBase implements ReadableStore {
     buffer: Uint8Array | ArrayBuffer,
     options?: number | FromBufferOptions
   ): MarcBase {
-    const { cacheCapacity = 200, onIssue, ...scanOptions } = normalizeFromBufferOptions(options);
+    const {
+      cacheCapacity = 200,
+      copyBuffer,
+      onIssue,
+      ...scanOptions
+    } = normalizeFromBufferOptions(options);
     const { index, issues } = scanBuffer(buffer, {
       ...scanOptions,
       onIssue: onIssue ?? ((issue) => console.warn(issue.message)),
     });
-    return new MarcBase(buffer, index, cacheCapacity, { indexIssues: issues });
+    return new MarcBase(buffer, index, cacheCapacity, { indexIssues: issues, copyBuffer });
   }
 
   get totalRecords(): number {
@@ -148,7 +157,19 @@ export class MarcBase implements ReadableStore {
     }
   }
 
+  /**
+   * The record's original bytes, as a copy the caller may modify freely.
+   * Use `iterateSerializedRecords()` for zero-copy access when writing out.
+   */
   getSerializedRecord(index: number): Uint8Array {
+    return this.getSerializedRecordView(index).slice();
+  }
+
+  /**
+   * Zero-copy view of the record's original bytes. The view shares memory
+   * with the store: writing to it corrupts the store, so treat it as read-only.
+   */
+  getSerializedRecordView(index: number): Uint8Array {
     if (index < 0 || index >= this.recordIndex.length) {
       throw new RangeError(`Record index ${index} out of range [0, ${this.recordIndex.length})`);
     }
@@ -156,6 +177,10 @@ export class MarcBase implements ReadableStore {
     return new Uint8Array(this.rawBuffer, this.rawBufferOffset + offset, length);
   }
 
+  /**
+   * Yields each record's bytes as a zero-copy view into the store's buffer.
+   * Treat the views as read-only; writing to them corrupts the store.
+   */
   *iterateSerializedRecords(): Generator<Uint8Array> {
     for (let i = 0; i < this.recordIndex.length; i++) {
       const { offset, length } = this.recordIndex[i]!;
