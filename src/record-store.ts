@@ -1,9 +1,10 @@
 import type { MarcRecord } from 'marc-ts';
-import type { RecordIndex } from './record-index.js';
-import { indexBuffer } from './record-index.js';
+import type { IndexIssue, RecordIndex } from './record-index.js';
+import { scanBuffer } from './record-index.js';
 import { MarcBase } from './marc-base.js';
 import { EditLayer } from './edit-layer.js';
-import type { RecordResult, RecordSlot } from './types.js';
+import type { FromBufferOptions, RecordResult, RecordSlot, StoreOptions } from './types.js';
+import { normalizeFromBufferOptions } from './types.js';
 
 export type { RecordResult, RecordSlot };
 
@@ -14,15 +15,38 @@ export class MarcFile {
   constructor(
     rawBuffer: ArrayBuffer | Uint8Array,
     recordIndex: RecordIndex[],
-    cacheCapacity = 200
+    cacheCapacity = 200,
+    options: StoreOptions = {}
   ) {
-    this._base = new MarcBase(rawBuffer, recordIndex, cacheCapacity);
+    this._base = new MarcBase(rawBuffer, recordIndex, cacheCapacity, options);
     this._edits = new EditLayer(this._base);
   }
 
-  static fromBuffer(buffer: Uint8Array | ArrayBuffer, cacheCapacity = 200): MarcFile {
-    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-    return new MarcFile(buffer, indexBuffer(bytes), cacheCapacity);
+  /**
+   * Index `buffer` with `scanBuffer` and construct a store over it.
+   *
+   * Indexing problems are available afterwards as `indexIssues`. If that is
+   * non-empty the file may be only partially indexed, and exporting it would
+   * drop the unindexed records. For backward compatibility, issues are also
+   * logged with `console.warn` unless an `onIssue` callback is supplied.
+   *
+   * @param options - Options object, or (legacy) the cache capacity
+   */
+  static fromBuffer(
+    buffer: Uint8Array | ArrayBuffer,
+    options?: number | FromBufferOptions
+  ): MarcFile {
+    const { cacheCapacity = 200, onIssue, ...scanOptions } = normalizeFromBufferOptions(options);
+    const { index, issues } = scanBuffer(buffer, {
+      ...scanOptions,
+      onIssue: onIssue ?? ((issue) => console.warn(issue.message)),
+    });
+    return new MarcFile(buffer, index, cacheCapacity, { indexIssues: issues });
+  }
+
+  /** Problems found while indexing the buffer; see `scanBuffer`. */
+  get indexIssues(): readonly IndexIssue[] {
+    return this._base.indexIssues;
   }
 
   get base(): MarcBase {

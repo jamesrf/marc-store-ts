@@ -1,4 +1,5 @@
 import type { MarcRecord } from 'marc-ts';
+import type { IndexIssue, ScanOptions } from './record-index.js';
 
 export type RecordResult = { ok: true; record: MarcRecord } | { ok: false; error: string };
 
@@ -26,4 +27,21 @@ export interface EditableStore extends ReadableStore {
   revertRecord(position: number): void;
   revertAll(): void;
   isModified(position: number): boolean;
+}
+
+export interface StoreOptions {
+  /** Issues found while indexing the buffer, exposed as `indexIssues`. */
+  indexIssues?: readonly IndexIssue[];
+}
+
+export interface FromBufferOptions extends ScanOptions {
+  /** Maximum number of parsed records kept in the LRU cache. Default 200. */
+  cacheCapacity?: number;
+}
+
+/** Accepts the legacy `cacheCapacity` number or an options object. */
+export function normalizeFromBufferOptions(
+  options: number | FromBufferOptions | undefined
+): FromBufferOptions {
+  return typeof options === 'number' ? { cacheCapacity: options } : (options ?? {});
 }

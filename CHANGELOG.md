@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `scanBuffer()` returns `{ index, issues, bytesConsumed }` so callers can detect a partially indexed file. Its `recover` option skips corrupt records by resynchronising on the next record terminator.
+- `MarcFile.fromBuffer` / `MarcBase.fromBuffer` accept an options object (`cacheCapacity`, `recover`, `onIssue`) and expose `indexIssues`. A plain cache-capacity number is still accepted.
 - `LICENSE` file (MIT) and full package metadata (`description`, `repository`, `homepage`, `bugs`, `keywords`).
 - `examples/generate-sample-data.ts` and an `npm run examples` script that runs every example in CI.
 
@@ -18,6 +20,8 @@ All notable changes to this project are documented here. The format is based on
 ### Fixed
 - README: Node requirement, scripts list, `marc-ts` link and architecture description now match the code; unbenchmarked timing claims removed.
 - Examples README: replaced an outdated `marc-ts` snippet and `ts-node` instructions.
+- Indexing no longer stops at whitespace between records, so newline-separated MARC files are fully indexed instead of silently truncated after the first record.
+- Indexing reports records that are missing the 0x1D record terminator.
 - `toMarcXml` now escapes tag, indicator and subfield-code attributes; an indicator such as `"` previously produced invalid XML.
 
 ## [0.1.0] - 2026-05-25

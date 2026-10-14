@@ -1,9 +1,11 @@
 import type { MarcRecord } from 'marc-ts';
 import { parseMarcBinary } from 'marc-ts';
 import type { RecordIndex } from './record-index.js';
-import { indexBuffer } from './record-index.js';
+import type { IndexIssue } from './record-index.js';
+import { scanBuffer } from './record-index.js';
 import { LRUCache } from './lru-cache.js';
-import type { RecordResult, ReadableStore } from './types.js';
+import type { FromBufferOptions, RecordResult, ReadableStore, StoreOptions } from './types.js';
+import { normalizeFromBufferOptions } from './types.js';
 
 export function deepFreezeRecord(record: MarcRecord): MarcRecord {
   Object.freeze(record);
@@ -25,11 +27,14 @@ export class MarcBase implements ReadableStore {
   private readonly rawBufferOffset: number;
   private readonly recordIndex: RecordIndex[];
   private readonly cache: LRUCache<number, MarcRecord>;
+  /** Problems found while indexing the buffer (empty if none, or if the index was supplied). */
+  readonly indexIssues: readonly IndexIssue[];
 
   constructor(
     rawBuffer: ArrayBuffer | Uint8Array,
     recordIndex: RecordIndex[],
-    cacheCapacity = 200
+    cacheCapacity = 200,
+    options: StoreOptions = {}
   ) {
     if (rawBuffer instanceof Uint8Array) {
       this.rawBuffer = rawBuffer.buffer as ArrayBuffer;
@@ -40,11 +45,26 @@ export class MarcBase implements ReadableStore {
     }
     this.recordIndex = recordIndex;
     this.cache = new LRUCache(cacheCapacity);
+    this.indexIssues = options.indexIssues ?? [];
   }
 
-  static fromBuffer(buffer: Uint8Array | ArrayBuffer, cacheCapacity = 200): MarcBase {
-    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-    return new MarcBase(buffer, indexBuffer(bytes), cacheCapacity);
+  /**
+   * Index `buffer` with `scanBuffer` and construct a store over it. Issues
+   * found while indexing are available as `indexIssues`, and are also logged
+   * with `console.warn` unless an `onIssue` callback is supplied.
+   *
+   * @param options - Options object, or (legacy) the cache capacity
+   */
+  static fromBuffer(
+    buffer: Uint8Array | ArrayBuffer,
+    options?: number | FromBufferOptions
+  ): MarcBase {
+    const { cacheCapacity = 200, onIssue, ...scanOptions } = normalizeFromBufferOptions(options);
+    const { index, issues } = scanBuffer(buffer, {
+      ...scanOptions,
+      onIssue: onIssue ?? ((issue) => console.warn(issue.message)),
+    });
+    return new MarcBase(buffer, index, cacheCapacity, { indexIssues: issues });
   }
 
   get totalRecords(): number {

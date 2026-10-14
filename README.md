@@ -72,14 +72,28 @@ The main storage engine for MARC files. Exported as both `MarcFile` (primary nam
 #### Static factory
 
 ```typescript
-static fromBuffer(buffer: Uint8Array | ArrayBuffer, cacheCapacity = 200): MarcFile
+static fromBuffer(
+  buffer: Uint8Array | ArrayBuffer,
+  options?: number | FromBufferOptions
+): MarcFile
+
+interface FromBufferOptions {
+  cacheCapacity?: number;                  // LRU cache size (default 200)
+  recover?: boolean;                       // skip corrupt records instead of stopping (default false)
+  onIssue?: (issue: IndexIssue) => void;   // replaces the default console.warn
+}
 ```
 
-Convenience factory — indexes the buffer and constructs the store in one call. Equivalent to `new MarcFile(buffer, indexBuffer(buffer), cacheCapacity)`.
+Convenience factory — indexes the buffer with [`scanBuffer()`](#scanbuffer) and constructs the store in one call. A plain number is still accepted as the cache capacity.
+
+Any indexing problems are available afterwards as `store.indexIssues`. **If it is non-empty, the file may be only partially indexed**, and exporting the store would drop the unindexed records:
 
 ```typescript
 import { MarcFile } from 'marc-store-ts';
-const store = MarcFile.fromBuffer(readFileSync('catalog.mrc'));
+const store = MarcFile.fromBuffer(readFileSync('catalog.mrc'), { onIssue: () => {} });
+if (store.indexIssues.length > 0) {
+  console.error(`Indexed ${store.totalRecords} records with problems:`, store.indexIssues);
+}
 ```
 
 #### Constructor
@@ -223,28 +237,49 @@ for (const chunk of chunks) {
 writeFileSync('modified-catalog.mrc', output);
 ```
 
+### scanBuffer()
+
+Scans a MARC file buffer and builds a lightweight index of record boundaries, returning any problems as data. It reads only each record's 5-byte length (and checks its last byte for the `0x1D` record terminator); record content is not parsed. It never throws and never logs.
+
+```typescript
+function scanBuffer(buffer: Uint8Array | ArrayBuffer, options?: ScanOptions): ScanResult
+
+interface ScanOptions {
+  recover?: boolean;                      // resync on the next 0x1D instead of stopping (default false)
+  onIssue?: (issue: IndexIssue) => void;  // called as each issue is found
+}
+
+interface ScanResult {
+  index: RecordIndex[];    // records found, in file order
+  issues: IndexIssue[];    // empty for a clean file
+  bytesConsumed: number;   // less than buffer.length if scanning stopped early
+}
+
+interface IndexIssue {
+  kind: 'truncated-length' | 'invalid-length' | 'too-short' | 'overflow'
+      | 'missing-terminator' | 'skipped';
+  offset: number;
+  message: string;
+}
+```
+
+Behaviour:
+- Whitespace between records (newlines, spaces, NUL padding), which some exports add, is skipped.
+- A record whose last byte is not `0x1D` is still indexed, with a `missing-terminator` issue.
+- An invalid length stops the scan, unless `recover` is set, in which case the scanner skips to the byte after the next `0x1D` and continues, reporting a `skipped` issue.
+
+```typescript
+const { index, issues } = scanBuffer(buffer, { recover: true });
+console.log(`Indexed ${index.length} records, ${issues.length} issues`);
+```
+
 ### indexBuffer()
 
-Scans a MARC file buffer and builds a lightweight index of record boundaries.
-
 ```typescript
-function indexBuffer(buffer: Uint8Array | ArrayBuffer): RecordIndex[]
+function indexBuffer(buffer: Uint8Array | ArrayBuffer, options?: ScanOptions): RecordIndex[]
 ```
 
-**Parameters:**
-- `buffer`: The MARC file as a `Uint8Array` or `ArrayBuffer`
-
-**Returns:** Array of `{ offset: number; length: number }` for each record
-
-**Error Handling:**
-- Emits warnings (console.warn) for malformed data
-- Returns partial index on errors (doesn't throw)
-- Handles truncated records, invalid lengths, and overflow gracefully
-
-```typescript
-const index = indexBuffer(buffer);
-console.log(`Indexed ${index.length} records`);
-```
+Equivalent to `scanBuffer(buffer, options).index`. For backward compatibility, issues are logged with `console.warn` unless `onIssue` is supplied. Prefer `scanBuffer()` when you need to know whether the index is complete.
 
 ### RecordIndex
 
