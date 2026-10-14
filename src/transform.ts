@@ -126,13 +126,17 @@ export function toMarcXml(store: ReadableStore, options?: ToMarcXmlOptions): str
     lines.push(`    <leader>${escapeXml(record.leader)}</leader>`);
     for (const field of record.fields) {
       if (isControlField(field)) {
-        lines.push(`    <controlfield tag="${field.tag}">${escapeXml(field.data)}</controlfield>`);
+        lines.push(
+          `    <controlfield tag="${escapeXml(field.tag)}">${escapeXml(field.data)}</controlfield>`
+        );
       } else if (isDataField(field)) {
         lines.push(
-          `    <datafield tag="${field.tag}" ind1="${field.indicator1}" ind2="${field.indicator2}">`
+          `    <datafield tag="${escapeXml(field.tag)}" ind1="${escapeXml(field.indicator1)}" ind2="${escapeXml(field.indicator2)}">`
         );
         for (const sub of field.subfields) {
-          lines.push(`      <subfield code="${sub.code}">${escapeXml(sub.value)}</subfield>`);
+          lines.push(
+            `      <subfield code="${escapeXml(sub.code)}">${escapeXml(sub.value)}</subfield>`
+          );
         }
         lines.push('    </datafield>');
       }

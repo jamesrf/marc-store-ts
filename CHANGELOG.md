@@ -18,6 +18,7 @@ All notable changes to this project are documented here. The format is based on
 ### Fixed
 - README: Node requirement, scripts list, `marc-ts` link and architecture description now match the code; unbenchmarked timing claims removed.
 - Examples README: replaced an outdated `marc-ts` snippet and `ts-node` instructions.
+- `toMarcXml` now escapes tag, indicator and subfield-code attributes; an indicator such as `"` previously produced invalid XML.
 
 ## [0.1.0] - 2026-05-25
 

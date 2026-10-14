@@ -228,6 +228,24 @@ describe('toMarcXml', () => {
     expect(xml).toContain('&apos;');
     expect(xml).not.toContain(' & ');
   });
+
+  it('escapes special characters in tag, indicator and subfield code attributes', () => {
+    const store = MarcFile.fromBuffer(createMultiRecordBuffer(1));
+    store.setRecord(0, {
+      leader: '00000nam  2200000   4500',
+      fields: [
+        {
+          tag: '245',
+          indicator1: '"',
+          indicator2: '&',
+          subfields: [{ code: '<', value: 'v' }],
+        },
+      ],
+    });
+    const xml = toMarcXml(store);
+    expect(xml).toContain('<datafield tag="245" ind1="&quot;" ind2="&amp;">');
+    expect(xml).toContain('<subfield code="&lt;">v</subfield>');
+  });
 });
 
 describe('toJson', () => {
