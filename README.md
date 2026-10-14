@@ -590,12 +590,9 @@ import { writeFileSync } from 'fs';
 import { toMarcXml } from 'marc-store-ts';
 
 writeFileSync('output.xml', toMarcXml(store));
-
-// Custom encoding declaration
-writeFileSync('output.xml', toMarcXml(store, { encoding: 'UTF-8' }));
 ```
 
-Output follows the [Library of Congress MARCXML schema](https://www.loc.gov/standards/marcxml/). Special characters in field data (`&`, `<`, `>`, `"`, `'`) are automatically escaped.
+Output follows the [Library of Congress MARCXML schema](https://www.loc.gov/standards/marcxml/) and is always UTF-8. Special characters in field data and attributes (`&`, `<`, `>`, `"`, `'`) are escaped. Records that were MARC-8 in the source file are written as Unicode with leader/09 set to `a` (see [Character encoding](#character-encoding)).
 
 #### `toJson(store, options?)` — JSON (`.json`)
 
@@ -603,17 +600,35 @@ Output follows the [Library of Congress MARCXML schema](https://www.loc.gov/stan
 import { writeFileSync } from 'fs';
 import { toJson } from 'marc-store-ts';
 
-// Compact
-writeFileSync('output.json', toJson(store));
-
-// Pretty-printed
-writeFileSync('output.json', toJson(store, { pretty: true }));
+writeFileSync('output.json', toJson(store));                       // MARC-in-JSON, compact
+writeFileSync('output.json', toJson(store, { pretty: true }));     // indented
+writeFileSync('output.ndjson', toJson(store, { ndjson: true }));   // one record per line
 ```
 
-Each record is serialized as:
+| Option | Default | |
+|---|---|---|
+| `format` | `'marc-in-json'` | `'marc-in-json'` or `'simple'` (below) |
+| `pretty` | `false` | Indent with 2 spaces (ignored with `ndjson`) |
+| `ndjson` | `false` | Newline-delimited JSON: one record per line, no enclosing array |
+| `onError` | `'throw'` | See [Handling records that fail to parse](#handling-records-that-fail-to-parse) |
+
+By default each record is written in the community-standard [MARC-in-JSON](https://rossfsinger.com/blog/2010/09/a-proposal-to-serialize-marc-in-json/) format, which other MARC tools (and `parseMarcJson` in `marc-ts/json`) can read:
+
 ```json
 {
-  "leader": "00000nam  2200000   4500",
+  "leader": "00000nam a2200000   4500",
+  "fields": [
+    { "001": "ocm12345678" },
+    { "245": { "ind1": "1", "ind2": "0", "subfields": [{ "a": "The Catcher in the Rye" }] } }
+  ]
+}
+```
+
+`format: 'simple'` writes the more explicit shape used before 0.2.0:
+
+```json
+{
+  "leader": "00000nam a2200000   4500",
   "fields": [
     { "tag": "001", "data": "ocm12345678" },
     {
@@ -625,6 +640,28 @@ Each record is serialized as:
   ]
 }
 ```
+
+#### Streaming large exports
+
+`toMarcXml` and `toJson` build the whole output as one string, which can exceed JavaScript's string length limit for very large files. `iterateMarcXml(store, options?)` and `iterateJson(store, options?)` take the same options but yield the output in chunks (one per record), so you can stream it to disk:
+
+```typescript
+import { createWriteStream } from 'fs';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
+import { iterateMarcXml, iterateJson } from 'marc-store-ts';
+
+await pipeline(Readable.from(iterateMarcXml(store)), createWriteStream('output.xml'));
+await pipeline(Readable.from(iterateJson(store, { ndjson: true })), createWriteStream('output.ndjson'));
+```
+
+Joined, the chunks are exactly what `toMarcXml` / `toJson` return.
+
+#### Character encoding
+
+MARC records are either MARC-8 (leader/09 is a space) or UTF-8 (leader/09 is `a`). `marc-ts` converts MARC-8 text to Unicode when it parses a record, so every record you read from the store holds Unicode strings. Accented characters from MARC-8 come out decomposed (a base letter followed by a combining accent, Unicode NFD); call `.normalize('NFC')` if you need composed characters.
+
+The XML and JSON exports are always Unicode, so they set leader/09 to `a` for records that were MARC-8 in the source file.
 
 ### Putting it together
 

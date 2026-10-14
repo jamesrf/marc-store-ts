@@ -197,12 +197,6 @@ describe('toMarcXml', () => {
     expect(xml).toContain('<subfield code="a">');
   });
 
-  it('respects custom encoding option', () => {
-    const store = MarcFile.fromBuffer(createMultiRecordBuffer(1));
-    const xml = toMarcXml(store, { encoding: 'ISO-8859-1' });
-    expect(xml).toContain('encoding="ISO-8859-1"');
-  });
-
   it('produces valid XML for empty store', () => {
     const store = MarcFile.fromBuffer(new Uint8Array(0));
     const xml = toMarcXml(store);
@@ -259,18 +253,22 @@ describe('toJson', () => {
     expect(Array.isArray(first['fields'])).toBe(true);
   });
 
-  it('serializes control fields as { tag, data }', () => {
+  it("format: 'simple' serializes control fields as { tag, data }", () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(1));
-    const parsed = JSON.parse(toJson(store)) as Array<{ fields: Array<Record<string, unknown>> }>;
+    const parsed = JSON.parse(toJson(store, { format: 'simple' })) as Array<{
+      fields: Array<Record<string, unknown>>;
+    }>;
     const controlField = parsed[0].fields.find((f) => f['tag'] === '001');
     expect(controlField).toBeDefined();
     expect(typeof controlField!['data']).toBe('string');
     expect(controlField!['subfields']).toBeUndefined();
   });
 
-  it('serializes data fields as { tag, indicator1, indicator2, subfields }', () => {
+  it("format: 'simple' serializes data fields as { tag, indicator1, indicator2, subfields }", () => {
     const store = MarcFile.fromBuffer(createMultiRecordBuffer(1));
-    const parsed = JSON.parse(toJson(store)) as Array<{ fields: Array<Record<string, unknown>> }>;
+    const parsed = JSON.parse(toJson(store, { format: 'simple' })) as Array<{
+      fields: Array<Record<string, unknown>>;
+    }>;
     const dataField = parsed[0].fields.find((f) => f['tag'] === '245');
     expect(dataField).toBeDefined();
     expect(typeof dataField!['indicator1']).toBe('string');
