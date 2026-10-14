@@ -204,3 +204,15 @@ describe('wrong leader length', () => {
     expect(store.getSerializedRecord(1)).toEqual(clean[1]);
   });
 });
+
+describe('fromBuffer logging', () => {
+  it('logs nothing by default; issues are still available', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const store = MarcFile.fromBuffer(concat(rec('1'), 'abc'));
+    const base = MarcBase.fromBuffer(concat(rec('1'), 'abc'));
+    expect(warn).not.toHaveBeenCalled();
+    expect(store.indexIssues).toHaveLength(1);
+    expect(base.indexIssues).toHaveLength(1);
+    warn.mockRestore();
+  });
+});

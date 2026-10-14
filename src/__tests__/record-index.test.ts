@@ -46,7 +46,7 @@ describe('indexBuffer', () => {
   });
 
   it('stops at truncated length field', () => {
-    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnings = vi.fn();
 
     const record = createTypicalRecord('12345678');
     const fullBuffer = serializeRecord(record);
@@ -54,51 +54,41 @@ describe('indexBuffer', () => {
     // Truncate to only 3 bytes (need 5 for length field)
     const truncatedBuffer = fullBuffer.slice(0, 3);
 
-    const index = indexBuffer(truncatedBuffer);
+    const index = indexBuffer(truncatedBuffer, { onIssue: (issue) => warnings(issue.message) });
 
     expect(index).toHaveLength(0); // No complete records
-    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Truncated length field'));
-
-    consoleWarnSpy.mockRestore();
+    expect(warnings).toHaveBeenCalledWith(expect.stringContaining('Truncated length field'));
   });
 
   it('stops at invalid (non-numeric) length', () => {
-    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnings = vi.fn();
 
     // Create buffer with invalid length field
     const buffer = new Uint8Array(24);
     const encoder = new TextEncoder();
     encoder.encodeInto('XXXXX', buffer); // Invalid length (not numeric)
 
-    const index = indexBuffer(buffer);
+    const index = indexBuffer(buffer, { onIssue: (issue) => warnings(issue.message) });
 
     expect(index).toHaveLength(0);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid (non-numeric) length')
-    );
-
-    consoleWarnSpy.mockRestore();
+    expect(warnings).toHaveBeenCalledWith(expect.stringContaining('Invalid (non-numeric) length'));
   });
 
   it('stops at partial-number length field (e.g. "1234X")', () => {
-    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnings = vi.fn();
 
     const buffer = new Uint8Array(24);
     const encoder = new TextEncoder();
     encoder.encodeInto('1234X', buffer); // parseInt would return 1234, but must be rejected
 
-    const index = indexBuffer(buffer);
+    const index = indexBuffer(buffer, { onIssue: (issue) => warnings(issue.message) });
 
     expect(index).toHaveLength(0);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid (non-numeric) length')
-    );
-
-    consoleWarnSpy.mockRestore();
+    expect(warnings).toHaveBeenCalledWith(expect.stringContaining('Invalid (non-numeric) length'));
   });
 
   it('stops when record would overflow buffer', () => {
-    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnings = vi.fn();
 
     const record1 = createTypicalRecord('00000001');
     const record2 = createTypicalRecord('00000002');
@@ -114,14 +104,12 @@ describe('indexBuffer', () => {
     // Truncate so second record is incomplete
     const truncatedBuffer = fullBuffer.slice(0, buffer1.length + 10);
 
-    const index = indexBuffer(truncatedBuffer);
+    const index = indexBuffer(truncatedBuffer, { onIssue: (issue) => warnings(issue.message) });
 
     // Should only index the first record
     expect(index).toHaveLength(1);
     expect(index[0].length).toBe(buffer1.length);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('would overflow buffer'));
-
-    consoleWarnSpy.mockRestore();
+    expect(warnings).toHaveBeenCalledWith(expect.stringContaining('would overflow buffer'));
   });
 
   it('handles minimum-size records (24 bytes)', () => {
@@ -141,19 +129,17 @@ describe('indexBuffer', () => {
   });
 
   it('stops at record with length < 24', () => {
-    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnings = vi.fn();
 
     // Create buffer with invalid short length
     const buffer = new Uint8Array(24);
     const encoder = new TextEncoder();
     encoder.encodeInto('00010', buffer); // Length of 10 (< 24 minimum)
 
-    const index = indexBuffer(buffer);
+    const index = indexBuffer(buffer, { onIssue: (issue) => warnings(issue.message) });
 
     expect(index).toHaveLength(0);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('< 24 bytes'));
-
-    consoleWarnSpy.mockRestore();
+    expect(warnings).toHaveBeenCalledWith(expect.stringContaining('< 24 bytes'));
   });
 
   it('indexes large number of records efficiently', () => {
@@ -197,5 +183,12 @@ describe('indexBuffer', () => {
     for (let i = 0; i < index.length; i++) {
       expect(index[i].length).toBe(buffers[i].length);
     }
+  });
+
+  it('logs nothing by default', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(indexBuffer(new TextEncoder().encode('abc'))).toEqual([]);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

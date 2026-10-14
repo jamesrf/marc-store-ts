@@ -32,8 +32,8 @@ export class MarcFile extends EditLayer {
    *
    * Indexing problems are available afterwards as `indexIssues`. If that is
    * non-empty the file may be only partially indexed, and exporting it would
-   * drop the unindexed records. For backward compatibility, issues are also
-   * logged with `console.warn` unless an `onIssue` callback is supplied.
+   * drop the unindexed records. Nothing is logged; pass `onIssue` to be
+   * told about each issue as it is found.
    *
    * @param options - Options object, or (legacy) the cache capacity
    */
@@ -41,16 +41,8 @@ export class MarcFile extends EditLayer {
     buffer: Uint8Array | ArrayBuffer,
     options?: number | FromBufferOptions
   ): MarcFile {
-    const {
-      cacheCapacity = 200,
-      copyBuffer,
-      onIssue,
-      ...scanOptions
-    } = normalizeFromBufferOptions(options);
-    const { index, issues } = scanBuffer(buffer, {
-      ...scanOptions,
-      onIssue: onIssue ?? ((issue) => console.warn(issue.message)),
-    });
+    const { cacheCapacity = 200, copyBuffer, ...scanOptions } = normalizeFromBufferOptions(options);
+    const { index, issues } = scanBuffer(buffer, scanOptions);
     return new MarcFile(buffer, index, cacheCapacity, { indexIssues: issues, copyBuffer });
   }
 

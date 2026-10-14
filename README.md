@@ -79,7 +79,7 @@ static fromBuffer(
 
 interface FromBufferOptions {
   cacheCapacity?: number;                  // LRU cache size (default 200)
-  onIssue?: (issue: IndexIssue) => void;   // replaces the default console.warn
+  onIssue?: (issue: IndexIssue) => void;   // called for each indexing issue as it's found
   copyBuffer?: boolean;                    // copy the buffer instead of referencing it (default false)
 }
 ```
@@ -92,7 +92,7 @@ Any indexing problems are available afterwards as `store.indexIssues`. **If it i
 
 ```typescript
 import { MarcFile } from 'marc-store-ts';
-const store = MarcFile.fromBuffer(readFileSync('catalog.mrc'), { onIssue: () => {} });
+const store = MarcFile.fromBuffer(readFileSync('catalog.mrc'));
 if (store.indexIssues.length > 0) {
   console.error(`Indexed ${store.totalRecords} records with problems:`, store.indexIssues);
 }
@@ -298,7 +298,7 @@ console.log(`Indexed ${index.length} records, ${issues.length} issues`);
 function indexBuffer(buffer: Uint8Array | ArrayBuffer, options?: ScanOptions): RecordIndex[]
 ```
 
-Equivalent to `scanBuffer(buffer, options).index`. For backward compatibility, issues are logged with `console.warn` unless `onIssue` is supplied. Prefer `scanBuffer()` when you need to know whether the index is complete.
+Equivalent to `scanBuffer(buffer, options).index`. Issues are discarded unless you pass `onIssue`, so prefer `scanBuffer()` when you need to know whether the index is complete.
 
 ### RecordIndex
 

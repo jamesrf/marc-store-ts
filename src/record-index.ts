@@ -221,20 +221,16 @@ function checkRecordAt(
 
 /**
  * Scan a MARC file buffer and build a lightweight index of record boundaries.
- *
- * Equivalent to `scanBuffer(buffer, options).index`. For backward
- * compatibility, issues are logged with `console.warn` unless an `onIssue`
- * callback is supplied; use `scanBuffer` to get the issues back as data.
+ * Equivalent to `scanBuffer(buffer, options).index`: issues are discarded
+ * unless an `onIssue` callback is supplied, so prefer `scanBuffer` when you
+ * need to know whether the index is complete.
  *
  * @param buffer - Raw MARC file
- * @returns Array of {offset, length} for each valid record found
+ * @returns Array of {offset, length} for each record found
  */
 export function indexBuffer(
   buffer: ArrayBuffer | Uint8Array,
   options: ScanOptions = {}
 ): RecordIndex[] {
-  return scanBuffer(buffer, {
-    ...options,
-    onIssue: options.onIssue ?? ((issue) => console.warn(issue.message)),
-  }).index;
+  return scanBuffer(buffer, options).index;
 }

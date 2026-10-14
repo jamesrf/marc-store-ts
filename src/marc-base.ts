@@ -105,8 +105,8 @@ export class MarcBase implements ReadableStore, IdentifiedStore {
 
   /**
    * Index `buffer` with `scanBuffer` and construct a store over it. Issues
-   * found while indexing are available as `indexIssues`, and are also logged
-   * with `console.warn` unless an `onIssue` callback is supplied.
+   * found while indexing are available as `indexIssues` (and reported to
+   * `onIssue` as they are found, if supplied).
    *
    * @param options - Options object, or (legacy) the cache capacity
    */
@@ -114,16 +114,8 @@ export class MarcBase implements ReadableStore, IdentifiedStore {
     buffer: Uint8Array | ArrayBuffer,
     options?: number | FromBufferOptions
   ): MarcBase {
-    const {
-      cacheCapacity = 200,
-      copyBuffer,
-      onIssue,
-      ...scanOptions
-    } = normalizeFromBufferOptions(options);
-    const { index, issues } = scanBuffer(buffer, {
-      ...scanOptions,
-      onIssue: onIssue ?? ((issue) => console.warn(issue.message)),
-    });
+    const { cacheCapacity = 200, copyBuffer, ...scanOptions } = normalizeFromBufferOptions(options);
+    const { index, issues } = scanBuffer(buffer, scanOptions);
     return new MarcBase(buffer, index, cacheCapacity, { indexIssues: issues, copyBuffer });
   }
 

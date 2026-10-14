@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Breaking
+- Indexing problems are no longer logged with `console.warn`. They're returned by `scanBuffer`, exposed as `indexIssues` by `fromBuffer`, and passed to the `onIssue` callback if you supply one (`onIssue: (i) => console.warn(i.message)` restores the old logging).
 - The `slots` getter on `MarcFile`/`EditLayer` is removed: it copied every slot on each access. Use `getSlot(position)` or `iterateSlots()`.
 - `SearchIndex.rebuild()` is removed; it was an alias for `build()`.
 - `MarcFile` now extends `EditLayer` instead of wrapping one, so it inherits every reading, editing and serialization method. The `MarcFile.edits` getter is removed (use the `MarcFile` itself).
@@ -30,7 +31,7 @@ All notable changes to this project are documented here. The format is based on
 - `iterateRecordResults(store)`, yielding a `RecordResult` per position instead of throwing.
 - `copyBuffer` option on `fromBuffer` (and the constructors' options) to isolate the store from later writes to the caller's buffer.
 - `MarcBase.getSerializedRecordView()` for explicit zero-copy access to a record's original bytes.
-- `MarcFile.fromBuffer` / `MarcBase.fromBuffer` accept an options object (`cacheCapacity`, `onIssue`, `copyBuffer`) and expose `indexIssues`. A plain cache-capacity number is still accepted.
+- `MarcFile.fromBuffer` / `MarcBase.fromBuffer` accept an options object (`cacheCapacity`, `onIssue`, `copyBuffer`) and expose `indexIssues`.
 - `LICENSE` file (MIT) and full package metadata (`description`, `repository`, `homepage`, `bugs`, `keywords`).
 - `examples/generate-sample-data.ts` and an `npm run examples` script that runs every example in CI.
 
