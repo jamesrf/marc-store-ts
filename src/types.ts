@@ -23,7 +23,15 @@ export interface EditableStore extends ReadableStore {
   readonly modifiedCount: number;
   setRecord(position: number, record: MarcRecord): void;
   deleteRecord(position: number): void;
+  /**
+   * Delete several records at once. Positions refer to the store as it was
+   * before the call; duplicates are ignored. Throws RangeError (deleting
+   * nothing) if any position is out of range.
+   */
+  deleteRecords(positions: Iterable<number>): void;
   insertRecord(record: MarcRecord, afterPosition?: number): void;
+  /** Insert several records, in order, after `afterPosition` (default: at the end). */
+  insertRecords(records: Iterable<MarcRecord>, afterPosition?: number): void;
   revertRecord(position: number): void;
   revertAll(): void;
   isModified(position: number): boolean;

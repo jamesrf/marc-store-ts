@@ -639,3 +639,98 @@ describe('EditLayer', () => {
     });
   });
 });
+
+describe('EditLayer bulk operations', () => {
+  const ids = (layer: EditLayer) =>
+    Array.from(layer.iterateRecords(), ({ record }) => (record.fields[0] as { data: string }).data);
+
+  describe('deleteRecords', () => {
+    it('deletes the given positions as they were before the call', () => {
+      const layer = makeLayer(5);
+      const before = ids(layer);
+      layer.deleteRecords([1, 3]);
+      expect(layer.totalRecords).toBe(3);
+      expect(ids(layer)).toEqual([before[0], before[2], before[4]]);
+      expect(layer.modifiedCount).toBe(2);
+    });
+
+    it('accepts positions in any order and ignores duplicates', () => {
+      const layer = makeLayer(5);
+      layer.deleteRecords([4, 0, 4, 0]);
+      expect(layer.totalRecords).toBe(3);
+      expect(layer.modifiedCount).toBe(2);
+    });
+
+    it('removes inserted records outright and keeps counts consistent', () => {
+      const layer = makeLayer(3);
+      layer.insertRecord(createTypicalRecord('ins'), 0);
+      layer.setRecord(2, createTypicalRecord('mod'));
+      expect(layer.modifiedCount).toBe(2);
+      layer.deleteRecords([1, 2]); // the inserted record and the modified one
+      expect(layer.totalRecords).toBe(2);
+      expect(layer.modifiedCount).toBe(1); // the modified record, now deleted
+      expect(layer.slots.some((s) => s.kind === 'inserted')).toBe(false);
+      expect(layer.slots.filter((s) => s.kind === 'deleted')).toHaveLength(1);
+    });
+
+    it('deletes nothing if any position is out of range', () => {
+      const layer = makeLayer(3);
+      expect(() => layer.deleteRecords([0, 3])).toThrow(RangeError);
+      expect(() => layer.deleteRecords([0, 1.5])).toThrow(RangeError);
+      expect(layer.totalRecords).toBe(3);
+      expect(layer.modifiedCount).toBe(0);
+    });
+
+    it('is a no-op for an empty list', () => {
+      const layer = makeLayer(3);
+      layer.deleteRecords([]);
+      expect(layer.totalRecords).toBe(3);
+    });
+
+    it('can be undone with revertAll', () => {
+      const layer = makeLayer(4);
+      const before = ids(layer);
+      layer.deleteRecords([0, 2]);
+      layer.revertAll();
+      expect(ids(layer)).toEqual(before);
+    });
+  });
+
+  describe('insertRecords', () => {
+    it('appends records in order by default', () => {
+      const layer = makeLayer(2);
+      layer.insertRecords([createTypicalRecord('a'), createTypicalRecord('b')]);
+      expect(layer.totalRecords).toBe(4);
+      expect(ids(layer).slice(2)).toEqual(['a', 'b']);
+      expect(layer.modifiedCount).toBe(2);
+    });
+
+    it('inserts after the given position', () => {
+      const layer = makeLayer(3);
+      const before = ids(layer);
+      layer.insertRecords([createTypicalRecord('a'), createTypicalRecord('b')], 0);
+      expect(ids(layer)).toEqual([before[0], 'a', 'b', before[1], before[2]]);
+    });
+
+    it('accepts any iterable and freezes copies, not the caller objects', () => {
+      const layer = makeLayer(1);
+      const rec = createTypicalRecord('a');
+      layer.insertRecords(new Set([rec]));
+      expect(Object.isFrozen(rec)).toBe(false);
+      expect(Object.isFrozen(layer.getRecord(1))).toBe(true);
+    });
+
+    it('throws RangeError for an out-of-range position', () => {
+      const layer = makeLayer(2);
+      expect(() => layer.insertRecords([createTypicalRecord('a')], 2)).toThrow(RangeError);
+      expect(layer.totalRecords).toBe(2);
+    });
+
+    it('is a no-op for an empty list', () => {
+      const layer = makeLayer(2);
+      layer.insertRecords([]);
+      expect(layer.totalRecords).toBe(2);
+      expect(layer.modifiedCount).toBe(0);
+    });
+  });
+});

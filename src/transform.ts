@@ -71,11 +71,7 @@ export function deleteMatching(
       toDelete.push(index);
     }
   }
-  // Delete highest index first so lower indices remain stable.
-  toDelete.sort((a, b) => b - a);
-  for (const index of toDelete) {
-    store.deleteRecord(index);
-  }
+  store.deleteRecords(toDelete);
   return toDelete.length;
 }
 

@@ -6,7 +6,7 @@ import type { RecordResult, RecordSlot, EditableStore } from './types.js';
 
 export class EditLayer implements EditableStore {
   private readonly base: MarcBase;
-  private readonly _slots: RecordSlot[];
+  private _slots: RecordSlot[];
   private _totalRecords: number;
   private _modifiedCount: number;
   private _positionMap: number[] | null;
@@ -104,6 +104,48 @@ export class EditLayer implements EditableStore {
     this._positionMapDirty = true;
   }
 
+  /**
+   * Delete several records in one pass. Positions refer to the store as it
+   * was before the call; duplicates are ignored. If any position is out of
+   * range, throws RangeError and deletes nothing.
+   */
+  deleteRecords(positions: Iterable<number>): void {
+    const map = this._ensurePositionMap();
+    const marked = new Uint8Array(this._slots.length);
+    let count = 0;
+    for (const position of positions) {
+      if (!Number.isInteger(position) || position < 0 || position >= map.length) {
+        throw new RangeError(`Record index ${position} out of range [0, ${this.totalRecords})`);
+      }
+      const slotIndex = map[position]!;
+      if (marked[slotIndex] === 0) {
+        marked[slotIndex] = 1;
+        count++;
+      }
+    }
+    if (count === 0) return;
+
+    // Compact in place: inserted slots are dropped, others become 'deleted'.
+    let write = 0;
+    for (let read = 0; read < this._slots.length; read++) {
+      const slot = this._slots[read]!;
+      if (marked[read] === 0) {
+        this._slots[write++] = slot;
+        continue;
+      }
+      this._totalRecords--;
+      if (slot.kind === 'inserted') {
+        this._modifiedCount--;
+        continue;
+      }
+      if (slot.kind === 'original') this._modifiedCount++;
+      this.base.evictFromCache(slot.index);
+      this._slots[write++] = { kind: 'deleted', index: slot.index };
+    }
+    this._slots.length = write;
+    this._positionMapDirty = true;
+  }
+
   insertRecord(record: MarcRecord, afterPosition?: number): void {
     record = toFrozenRecord(record);
     if (afterPosition === undefined) {
@@ -120,6 +162,35 @@ export class EditLayer implements EditableStore {
     this._slots.splice(slotIndex + 1, 0, { kind: 'inserted', record });
     this._totalRecords++;
     this._modifiedCount++;
+    this._positionMapDirty = true;
+  }
+
+  /**
+   * Insert several records, in order, after `afterPosition` (default: at the
+   * end), in a single splice.
+   */
+  insertRecords(records: Iterable<MarcRecord>, afterPosition?: number): void {
+    let at = this._slots.length;
+    if (afterPosition !== undefined) {
+      const slotIndex = this._slotIndexAt(afterPosition);
+      if (slotIndex === -1) {
+        throw new RangeError(
+          `Record index ${afterPosition} out of range [0, ${this.totalRecords})`
+        );
+      }
+      at = slotIndex + 1;
+    }
+    const added: RecordSlot[] = [];
+    for (const record of records) {
+      added.push({ kind: 'inserted', record: toFrozenRecord(record) });
+    }
+    if (added.length === 0) return;
+    this._slots =
+      at === this._slots.length
+        ? this._slots.concat(added)
+        : [...this._slots.slice(0, at), ...added, ...this._slots.slice(at)];
+    this._totalRecords += added.length;
+    this._modifiedCount += added.length;
     this._positionMapDirty = true;
   }
 
@@ -213,7 +284,9 @@ export class EditLayer implements EditableStore {
 
   private _slotIndexAt(position: number): number {
     const map = this._ensurePositionMap();
-    return position >= 0 && position < map.length ? map[position]! : -1;
+    return Number.isInteger(position) && position >= 0 && position < map.length
+      ? map[position]!
+      : -1;
   }
 
   private _slotAt(position: number): RecordSlot | undefined {

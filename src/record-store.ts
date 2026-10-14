@@ -88,8 +88,14 @@ export class MarcFile {
   deleteRecord(position: number): void {
     this._edits.deleteRecord(position);
   }
+  deleteRecords(positions: Iterable<number>): void {
+    this._edits.deleteRecords(positions);
+  }
   insertRecord(record: MarcRecord, afterPosition?: number): void {
     this._edits.insertRecord(record, afterPosition);
+  }
+  insertRecords(records: Iterable<MarcRecord>, afterPosition?: number): void {
+    this._edits.insertRecords(records, afterPosition);
   }
   revertRecord(position: number): void {
     this._edits.revertRecord(position);

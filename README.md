@@ -200,6 +200,17 @@ store.insertRecord(newRecord);               // append
 store.insertRecord(newRecord, 3);            // insert after position 3
 ```
 
+##### deleteRecords(positions: Iterable\<number>): void / insertRecords(records: Iterable\<MarcRecord>, afterPosition?: number): void
+
+Bulk versions of `deleteRecord` and `insertRecord` that do a single pass over the store, so they stay fast for large batches. Each `deleteRecord` or `insertRecord` call costs time proportional to the file size (about 1 ms at 250K records); prefer the bulk forms when changing many records at once.
+
+`deleteRecords` positions refer to the store as it was before the call, may be in any order, and duplicates are ignored. If any position is out of range it throws `RangeError` and deletes nothing.
+
+```typescript
+store.deleteRecords([2, 7, 9]);                       // positions before the call
+store.insertRecords([recordA, recordB], 0);           // after position 0, in order
+```
+
 ##### getSerializedRecord(index: number): Uint8Array
 
 Returns the serialized binary representation of a single record, as a new `Uint8Array` you may modify freely (a copy of the original bytes for an unmodified record). For zero-copy access when writing a file, use `iterateSerializedRecords()`.
