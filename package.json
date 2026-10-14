@@ -1,6 +1,6 @@
 {
   "name": "marc-store-ts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Lazy-parsing, copy-on-write storage and editing for large MARC21 files",
   "keywords": [
     "marc",
