@@ -3,10 +3,18 @@ import type { IndexIssue, ScanOptions } from './record-index.js';
 
 export type RecordResult = { ok: true; record: MarcRecord } | { ok: false; error: string };
 
-type OriginalSlot = { kind: 'original'; index: number };
-type ModifiedSlot = { kind: 'modified'; index: number; record: MarcRecord };
-type DeletedSlot = { kind: 'deleted'; index: number };
-type InsertedSlot = { kind: 'inserted'; record: MarcRecord };
+/**
+ * A record's permanent identity in an editable store. Unlike a position, it
+ * does not change when other records are inserted or deleted, and it is never
+ * reused. Original records' IDs equal their index in the file; inserted
+ * records get IDs counting up from the file's record count.
+ */
+export type RecordId = number;
+
+type OriginalSlot = { kind: 'original'; id: RecordId; index: number };
+type ModifiedSlot = { kind: 'modified'; id: RecordId; index: number; record: MarcRecord };
+type DeletedSlot = { kind: 'deleted'; id: RecordId; index: number };
+type InsertedSlot = { kind: 'inserted'; id: RecordId; record: MarcRecord };
 
 export type RecordSlot = OriginalSlot | ModifiedSlot | DeletedSlot | InsertedSlot;
 
@@ -17,6 +25,14 @@ export interface ReadableStore {
   iterateRecords(): Generator<{ index: number; record: MarcRecord }>;
   iterateSerializedRecords(): Generator<Uint8Array>;
   getSerializedRecord(position: number): Uint8Array;
+}
+
+/** A store whose records have stable IDs (see `RecordId`). */
+export interface IdentifiedStore {
+  /** The ID of the record at `position`. Throws RangeError if out of range. */
+  idAt(position: number): RecordId;
+  /** The current position of the record with `id`, or undefined if it is deleted or unknown. */
+  positionOf(id: RecordId): number | undefined;
 }
 
 export interface EditableStore extends ReadableStore {

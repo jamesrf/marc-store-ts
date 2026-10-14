@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Stable record IDs: `idAt(position)`, `positionOf(id)`, `getRecordById(id)`, `revert(id)` and `deletedIds()` on `MarcFile` and `EditLayer` (`MarcBase` has `idAt`/`positionOf`, where ID equals index), plus the `RecordId` type and `IdentifiedStore` interface. IDs don't change when other records move and are never reused. `revert(id)` can undo a deletion, which `revertRecord(position)` cannot.
+- Every `RecordSlot` now has an `id`.
 - `deleteRecords(positions)` and `insertRecords(records, afterPosition?)` on `MarcFile`, `EditLayer` and the `EditableStore` interface, for single-pass bulk edits.
 - `npm run bench`: benchmarks over synthetic files of configurable size.
 - `scanBuffer()` returns `{ index, issues, bytesConsumed }` so callers can detect a partially indexed file.
@@ -26,7 +28,7 @@ All notable changes to this project are documented here. The format is based on
 ### Fixed
 - `deleteMatching` / `keepMatching` were quadratic (each delete rebuilt the position map): 4.7 s for 50K records. They now use `deleteRecords` and take 0.18 s, scaling linearly.
 - Records with a wrong leader length are now indexed by their 0x1D record terminator (reported as `length-mismatch`), parsed with the length corrected, and written out with a corrected leader. Previously one bad length made the record unparseable and stopped indexing, losing every record after it.
-- Docs: `revertRecord` was documented as restoring deleted records, which it cannot do; the README and JSDoc now say to use `revertAll()`. (Per-record restore of deletions is planned with stable record IDs.)
+- Docs: `revertRecord` was documented as restoring deleted records, which it cannot do (a deleted record has no position). Use the new `revert(id)`.
 - `getSerializedRecord()` now returns a copy. It previously returned a view into the store's buffer, so writing to the result corrupted the store. `iterateSerializedRecords()` still yields zero-copy views, now documented as read-only.
 - README: Node requirement, scripts list, `marc-ts` link and architecture description now match the code; unbenchmarked timing claims removed.
 - Examples README: replaced an outdated `marc-ts` snippet and `ts-node` instructions.

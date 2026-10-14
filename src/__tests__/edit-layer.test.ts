@@ -734,3 +734,124 @@ describe('EditLayer bulk operations', () => {
     });
   });
 });
+
+describe('EditLayer stable record IDs', () => {
+  const idOf = (record: { fields: readonly unknown[] }) =>
+    (record.fields[0] as { data: string }).data;
+
+  it('gives original records their file index as ID', () => {
+    const layer = makeLayer(3);
+    expect([0, 1, 2].map((p) => layer.idAt(p))).toEqual([0, 1, 2]);
+    expect(layer.slots.map((s) => s.id)).toEqual([0, 1, 2]);
+  });
+
+  it('keeps IDs stable as positions shift', () => {
+    const layer = makeLayer(4);
+    const id = layer.idAt(3);
+    const record = layer.getRecord(3);
+    layer.deleteRecord(0);
+    layer.insertRecord(createTypicalRecord('new'), 0);
+    layer.insertRecord(createTypicalRecord('new2'), 1);
+    expect(layer.positionOf(id)).toBe(4);
+    expect(layer.getRecordById(id)).toBe(record);
+  });
+
+  it('gives inserted records new IDs counting up from the file size, never reused', () => {
+    const layer = makeLayer(3);
+    layer.insertRecord(createTypicalRecord('a'));
+    layer.insertRecords([createTypicalRecord('b'), createTypicalRecord('c')], 0);
+    expect(layer.idAt(5)).toBe(3); // 'a', appended, now after b and c
+    expect([layer.idAt(1), layer.idAt(2)]).toEqual([4, 5]);
+    layer.revertAll();
+    layer.insertRecord(createTypicalRecord('d'));
+    expect(layer.idAt(3)).toBe(6);
+    expect(layer.positionOf(3)).toBeUndefined();
+  });
+
+  it('keeps the ID when a record is modified', () => {
+    const layer = makeLayer(2);
+    layer.insertRecord(createTypicalRecord('ins'));
+    const id = layer.idAt(2);
+    layer.setRecord(2, createTypicalRecord('changed'));
+    layer.setRecord(0, createTypicalRecord('mod'));
+    expect(layer.idAt(2)).toBe(id);
+    expect(layer.idAt(0)).toBe(0);
+  });
+
+  it('returns undefined from positionOf for deleted or unknown IDs', () => {
+    const layer = makeLayer(3);
+    layer.deleteRecord(1);
+    expect(layer.positionOf(1)).toBeUndefined();
+    expect(layer.positionOf(99)).toBeUndefined();
+    expect(layer.positionOf(-1)).toBeUndefined();
+    expect(layer.positionOf(0.5)).toBeUndefined();
+    expect(() => layer.getRecordById(1)).toThrow(RangeError);
+    expect(() => layer.idAt(2)).toThrow(RangeError);
+  });
+
+  describe('revert(id)', () => {
+    it('restores a deleted record to its original position', () => {
+      const layer = makeLayer(4);
+      const before = Array.from(layer.iterateRecords(), ({ record }) => idOf(record));
+      const id = layer.idAt(1);
+      layer.deleteRecord(1);
+      layer.deleteRecord(1); // the record originally at 2
+      expect(layer.revert(id)).toBe(true);
+      expect(layer.totalRecords).toBe(3);
+      expect(layer.modifiedCount).toBe(1);
+      expect(layer.positionOf(id)).toBe(1);
+      expect(Array.from(layer.iterateRecords(), ({ record }) => idOf(record))).toEqual([
+        before[0],
+        before[1],
+        before[3],
+      ]);
+    });
+
+    it('undoes a modification', () => {
+      const layer = makeLayer(2);
+      const original = layer.getRecord(1);
+      layer.setRecord(1, createTypicalRecord('mod'));
+      expect(layer.revert(layer.idAt(1))).toBe(true);
+      expect(layer.isModified(1)).toBe(false);
+      expect(layer.getRecord(1)).toEqual(original);
+      expect(layer.modifiedCount).toBe(0);
+    });
+
+    it('restores a modified-then-deleted record to its original content', () => {
+      const layer = makeLayer(2);
+      const original = layer.getRecord(0);
+      layer.setRecord(0, createTypicalRecord('mod'));
+      layer.deleteRecord(0);
+      expect(layer.revert(0)).toBe(true);
+      expect(layer.getRecord(0)).toEqual(original);
+      expect(layer.modifiedCount).toBe(0);
+    });
+
+    it('returns false for unmodified, inserted and unknown records', () => {
+      const layer = makeLayer(2);
+      layer.insertRecord(createTypicalRecord('ins'));
+      expect(layer.revert(0)).toBe(false);
+      expect(layer.revert(layer.idAt(2))).toBe(false);
+      expect(layer.revert(42)).toBe(false);
+      expect(layer.totalRecords).toBe(3);
+    });
+  });
+
+  it('lists deleted IDs in file order', () => {
+    const layer = makeLayer(5);
+    layer.deleteRecords([3, 1]);
+    layer.insertRecord(createTypicalRecord('ins'), 0);
+    layer.deleteRecord(1); // the inserted record: removed, not listed
+    expect(layer.deletedIds()).toEqual([1, 3]);
+  });
+});
+
+describe('MarcBase IDs', () => {
+  it('uses the record index as the ID', () => {
+    const base = makeBase(3);
+    expect(base.idAt(2)).toBe(2);
+    expect(base.positionOf(2)).toBe(2);
+    expect(base.positionOf(3)).toBeUndefined();
+    expect(() => base.idAt(3)).toThrow(RangeError);
+  });
+});

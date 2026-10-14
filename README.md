@@ -176,7 +176,7 @@ if (store.isModified(0)) {
 
 Reverts a modified record back to its original state. Has no effect on unmodified or inserted records (use `deleteRecord` to remove an inserted record).
 
-> **Note:** a deleted record no longer has a position, so `revertRecord` cannot restore it: `revertRecord(i)` after `deleteRecord(i)` acts on whichever record has moved into position `i`. Use `revertAll()` to restore deleted records.
+> **Note:** a deleted record no longer has a position, so `revertRecord` cannot restore it: `revertRecord(i)` after `deleteRecord(i)` acts on whichever record has moved into position `i`. To undo a deletion, use [`revert(id)`](#stable-record-ids) with the record's ID.
 
 ```typescript
 store.revertRecord(0);
@@ -184,7 +184,7 @@ store.revertRecord(0);
 
 ##### deleteRecord(index: number): void
 
-Marks a record as deleted in the edit layer. Deleted records are excluded from `totalRecords` and `iterateRecords()`, and later records shift down one position. Only `revertAll()` can restore a deleted record.
+Marks a record as deleted in the edit layer. Deleted records are excluded from `totalRecords` and `iterateRecords()`, and later records shift down one position. Restore it with [`revert(id)`](#stable-record-ids) (note the ID with `store.idAt(index)` before deleting) or `revertAll()`.
 
 ```typescript
 store.deleteRecord(5);
@@ -310,16 +310,42 @@ interface RecordIndex {
 }
 ```
 
+### Stable record IDs
+
+Positions shift whenever records are inserted or deleted. Every record also has a **`RecordId`** (a number) that never changes and is never reused, so you can hold on to a record across edits. Original records' IDs equal their index in the file; inserted records get IDs counting up from the file's record count.
+
+```typescript
+idAt(position: number): RecordId                   // throws RangeError if out of range
+positionOf(id: RecordId): number | undefined       // undefined if deleted or unknown
+getRecordById(id: RecordId): MarcRecord            // throws RangeError if deleted or unknown
+revert(id: RecordId): boolean                      // undo a modification or deletion
+deletedIds(): RecordId[]                           // original records currently deleted
+```
+
+`revert(id)` restores a deleted record to its original place in the file, or a modified record to its original content (a record that was modified and then deleted comes back with its original content). It returns `true` if anything changed. Inserted records can't be reverted; delete them instead.
+
+```typescript
+const id = store.idAt(5);
+store.deleteRecord(5);
+store.insertRecord(newRecord, 0);      // positions shift, the ID doesn't
+store.positionOf(id);                  // undefined: deleted
+store.revert(id);                      // back again
+store.positionOf(id);                  // 6: its original place, after the inserted record
+
+// Undo every deletion:
+for (const id of store.deletedIds()) store.revert(id);
+```
+
 ### RecordSlot
 
 Discriminated union representing the state of each record in the edit layer. Accessible via `store.slots`.
 
 ```typescript
 type RecordSlot =
-  | { kind: 'original'; index: number }                      // Unmodified — points to original buffer
-  | { kind: 'modified'; index: number; record: MarcRecord }  // Edited in place
-  | { kind: 'deleted'; index: number }                       // Marked for deletion
-  | { kind: 'inserted'; record: MarcRecord }                 // Newly inserted (no original counterpart)
+  | { kind: 'original'; id: RecordId; index: number }                      // Unmodified — points to original buffer
+  | { kind: 'modified'; id: RecordId; index: number; record: MarcRecord }  // Edited in place
+  | { kind: 'deleted'; id: RecordId; index: number }                       // Marked for deletion
+  | { kind: 'inserted'; id: RecordId; record: MarcRecord }                 // Newly inserted (no original counterpart)
 ```
 
 ## Full-Text Search

@@ -537,3 +537,18 @@ describe('MarcFile', () => {
     });
   });
 });
+
+describe('MarcFile stable record IDs', () => {
+  it('delegates the ID API to the edit layer', () => {
+    const store = MarcFile.fromBuffer(createMultiRecordBuffer(3));
+    const id = store.idAt(2);
+    const record = store.getRecord(2);
+    store.deleteRecord(0);
+    expect(store.positionOf(id)).toBe(1);
+    expect(store.getRecordById(id)).toBe(record);
+    expect(store.deletedIds()).toEqual([0]);
+    expect(store.revert(0)).toBe(true);
+    expect(store.totalRecords).toBe(3);
+    expect(store.deletedIds()).toEqual([]);
+  });
+});

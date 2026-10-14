@@ -3,12 +3,19 @@ import type { IndexIssue, RecordIndex } from './record-index.js';
 import { scanBuffer } from './record-index.js';
 import { MarcBase } from './marc-base.js';
 import { EditLayer } from './edit-layer.js';
-import type { FromBufferOptions, RecordResult, RecordSlot, StoreOptions } from './types.js';
+import type {
+  FromBufferOptions,
+  IdentifiedStore,
+  RecordId,
+  RecordResult,
+  RecordSlot,
+  StoreOptions,
+} from './types.js';
 import { normalizeFromBufferOptions } from './types.js';
 
 export type { RecordResult, RecordSlot };
 
-export class MarcFile {
+export class MarcFile implements IdentifiedStore {
   private readonly _base: MarcBase;
   private readonly _edits: EditLayer;
 
@@ -105,6 +112,27 @@ export class MarcFile {
   }
   isModified(position: number): boolean {
     return this._edits.isModified(position);
+  }
+
+  /** The stable ID of the record at `position`; see `RecordId`. */
+  idAt(position: number): RecordId {
+    return this._edits.idAt(position);
+  }
+  /** The current position of the record with `id`, or undefined if it is deleted or unknown. */
+  positionOf(id: RecordId): number | undefined {
+    return this._edits.positionOf(id);
+  }
+  /** The record with `id`. Throws RangeError if it is deleted or unknown. */
+  getRecordById(id: RecordId): MarcRecord {
+    return this._edits.getRecordById(id);
+  }
+  /** Undo a modification or deletion of the record with `id`. Returns true if anything changed. */
+  revert(id: RecordId): boolean {
+    return this._edits.revert(id);
+  }
+  /** IDs of the original records that are currently deleted, in file order. */
+  deletedIds(): RecordId[] {
+    return this._edits.deletedIds();
   }
 
   getSerializedRecord(position: number): Uint8Array {

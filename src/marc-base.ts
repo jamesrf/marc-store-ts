@@ -4,7 +4,14 @@ import type { RecordIndex } from './record-index.js';
 import type { IndexIssue } from './record-index.js';
 import { scanBuffer } from './record-index.js';
 import { LRUCache } from './lru-cache.js';
-import type { FromBufferOptions, RecordResult, ReadableStore, StoreOptions } from './types.js';
+import type {
+  FromBufferOptions,
+  IdentifiedStore,
+  RecordId,
+  RecordResult,
+  ReadableStore,
+  StoreOptions,
+} from './types.js';
 import { normalizeFromBufferOptions } from './types.js';
 
 export function deepFreezeRecord(record: MarcRecord): MarcRecord {
@@ -66,7 +73,7 @@ function leaderLengthMatches(bytes: Uint8Array, length: number): boolean {
   return n === length;
 }
 
-export class MarcBase implements ReadableStore {
+export class MarcBase implements ReadableStore, IdentifiedStore {
   private readonly rawBuffer: ArrayBuffer;
   private readonly rawBufferOffset: number;
   private readonly recordIndex: RecordIndex[];
@@ -150,6 +157,18 @@ export class MarcBase implements ReadableStore {
     }
     this.cache.set(index, record);
     return record;
+  }
+
+  /** Records in a MarcBase never move, so a record's ID is its index. */
+  idAt(index: number): RecordId {
+    if (!Number.isInteger(index) || index < 0 || index >= this.recordIndex.length) {
+      throw new RangeError(`Record index ${index} out of range [0, ${this.recordIndex.length})`);
+    }
+    return index;
+  }
+
+  positionOf(id: RecordId): number | undefined {
+    return Number.isInteger(id) && id >= 0 && id < this.recordIndex.length ? id : undefined;
   }
 
   tryGetRecord(index: number): RecordResult {
