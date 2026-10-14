@@ -131,10 +131,6 @@ export class MarcBase implements ReadableStore, IdentifiedStore {
     return this.recordIndex.length;
   }
 
-  get indexCount(): number {
-    return this.recordIndex.length;
-  }
-
   getRecord(index: number): MarcRecord {
     if (index < 0 || index >= this.recordIndex.length) {
       throw new RangeError(`Record index ${index} out of range [0, ${this.recordIndex.length})`);

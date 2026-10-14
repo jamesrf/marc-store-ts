@@ -11,7 +11,7 @@ import type {
 } from './types.js';
 
 export class EditLayer implements EditableStore, IdentifiedStore {
-  private readonly base: MarcBase;
+  private readonly _base: MarcBase;
   private _slots: RecordSlot[];
   private _totalRecords: number;
   private _modifiedCount: number;
@@ -23,21 +23,21 @@ export class EditLayer implements EditableStore, IdentifiedStore {
   private _positionOfSlot: Int32Array | null = null;
 
   constructor(base: MarcBase) {
-    this.base = base;
-    this._slots = Array.from({ length: base.indexCount }, (_, i): RecordSlot => ({
+    this._base = base;
+    this._slots = Array.from({ length: base.totalRecords }, (_, i): RecordSlot => ({
       kind: 'original',
       id: i,
       index: i,
     }));
-    this._nextId = base.indexCount;
-    this._totalRecords = base.indexCount;
+    this._nextId = base.totalRecords;
+    this._totalRecords = base.totalRecords;
     this._modifiedCount = 0;
     this._positionMap = null;
     this._positionMapDirty = true;
   }
 
   get baseStore(): MarcBase {
-    return this.base;
+    return this._base;
   }
 
   get totalRecords(): number {
@@ -126,7 +126,7 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     } else {
       if (current.kind === 'original') this._modifiedCount++;
       this._slots[slotIndex] = { kind: 'deleted', id: current.id, index: current.index };
-      this.base.evictFromCache(current.index);
+      this._base.evictFromCache(current.index);
       this._totalRecords--;
     }
     this._invalidateMaps();
@@ -167,7 +167,7 @@ export class EditLayer implements EditableStore, IdentifiedStore {
         continue;
       }
       if (slot.kind === 'original') this._modifiedCount++;
-      this.base.evictFromCache(slot.index);
+      this._base.evictFromCache(slot.index);
       this._slots[write++] = { kind: 'deleted', id: slot.id, index: slot.index };
     }
     this._slots.length = write;
@@ -232,7 +232,7 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     if (slotIndex === -1) return;
     const current = this._slots[slotIndex]!;
     if (current.kind === 'modified') {
-      this.base.evictFromCache(current.index);
+      this._base.evictFromCache(current.index);
       this._slots[slotIndex] = { kind: 'original', id: current.id, index: current.index };
       this._modifiedCount--;
     }
@@ -244,13 +244,13 @@ export class EditLayer implements EditableStore, IdentifiedStore {
       if (slot.kind === 'inserted') {
         this._slots.splice(i, 1);
       } else if (slot.kind === 'modified') {
-        this.base.evictFromCache(slot.index);
+        this._base.evictFromCache(slot.index);
         this._slots[i] = { kind: 'original', id: slot.id, index: slot.index };
       } else if (slot.kind === 'deleted') {
         this._slots[i] = { kind: 'original', id: slot.id, index: slot.index };
       }
     }
-    this._totalRecords = this.base.indexCount;
+    this._totalRecords = this._base.totalRecords;
     this._modifiedCount = 0;
     this._invalidateMaps();
   }
@@ -293,7 +293,7 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     if (slotIndex === -1) return false;
     const slot = this._slots[slotIndex]!;
     if (slot.kind === 'modified') {
-      this.base.evictFromCache(slot.index);
+      this._base.evictFromCache(slot.index);
       this._slots[slotIndex] = { kind: 'original', id: slot.id, index: slot.index };
       this._modifiedCount--;
       return true;
@@ -335,7 +335,7 @@ export class EditLayer implements EditableStore, IdentifiedStore {
       throw new RangeError(`Record index ${position} out of range [0, ${this.totalRecords})`);
     }
     if (slot.kind === 'original') {
-      return this.base.getSerializedRecord(slot.index);
+      return this._base.getSerializedRecord(slot.index);
     }
     if (slot.kind === 'modified' || slot.kind === 'inserted') {
       return serializeMarcBinary([slot.record]);
@@ -351,7 +351,7 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     for (const slot of this._slots) {
       if (slot.kind === 'deleted') continue;
       if (slot.kind === 'original') {
-        yield this.base.getSerializedRecordView(slot.index);
+        yield this._base.getSerializedRecordView(slot.index);
       } else {
         yield serializeMarcBinary([slot.record]);
       }
@@ -418,6 +418,6 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     if (slot.kind === 'deleted') {
       throw new RangeError(`Record index ${position} is deleted`);
     }
-    return this.base.getRecord(slot.index);
+    return this._base.getRecord(slot.index);
   }
 }

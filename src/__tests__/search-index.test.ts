@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { MarcRecord } from 'marc-ts';
 import { getField, isDataField } from 'marc-ts';
-import { MarcFile } from '../record-store.js';
+import { MarcFile } from '../marc-file.js';
 import { deleteMatching } from '../transform.js';
 import { SearchIndex, DEFAULT_SEARCH_FIELDS } from '../search-index.js';
 import {

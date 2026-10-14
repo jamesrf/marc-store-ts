@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { RecordStore, indexBuffer } from '../index.js';
+import { MarcFile, indexBuffer } from '../index.js';
 import { createMultiRecordBuffer } from './helpers/test-data.js';
 import { appendField, isDataField, type MarcRecord } from 'marc-ts';
 
@@ -8,7 +8,7 @@ describe('Integration Tests', () => {
     // Create a file with 100 records
     const buffer = createMultiRecordBuffer(100);
     const index = indexBuffer(buffer);
-    const store = new RecordStore(buffer.buffer, index);
+    const store = new MarcFile(buffer.buffer, index);
 
     expect(store.totalRecords).toBe(100);
 
@@ -29,7 +29,7 @@ describe('Integration Tests', () => {
     // Load file
     const buffer = createMultiRecordBuffer(10);
     const index = indexBuffer(buffer);
-    const store = new RecordStore(buffer.buffer, index);
+    const store = new MarcFile(buffer.buffer, index);
 
     // Modify record at index 5
     const original = store.getRecord(5);
@@ -57,7 +57,7 @@ describe('Integration Tests', () => {
 
     // Re-index and load
     const newIndex = indexBuffer(serialized);
-    const newStore = new RecordStore(serialized.buffer, newIndex);
+    const newStore = new MarcFile(serialized.buffer, newIndex);
 
     expect(newStore.totalRecords).toBe(10);
 
@@ -100,7 +100,7 @@ describe('Integration Tests', () => {
     const buffer = createMultiRecordBuffer(100);
     const index = indexBuffer(buffer);
     const cacheCapacity = 10;
-    const store = new RecordStore(buffer.buffer, index, cacheCapacity);
+    const store = new MarcFile(buffer.buffer, index, cacheCapacity);
 
     // Access more records than cache capacity
     for (let i = 0; i < 50; i++) {
@@ -120,7 +120,7 @@ describe('Integration Tests', () => {
   it('edge case: empty file (0 records)', () => {
     const buffer = new Uint8Array(0);
     const index = indexBuffer(buffer);
-    const store = new RecordStore(buffer.buffer, index);
+    const store = new MarcFile(buffer.buffer, index);
 
     expect(store.totalRecords).toBe(0);
     expect(store.modifiedCount).toBe(0);
@@ -132,7 +132,7 @@ describe('Integration Tests', () => {
   it('edge case: all records modified', () => {
     const buffer = createMultiRecordBuffer(5);
     const index = indexBuffer(buffer);
-    const store = new RecordStore(buffer.buffer, index);
+    const store = new MarcFile(buffer.buffer, index);
 
     // Modify all records
     for (let i = 0; i < 5; i++) {
@@ -164,7 +164,7 @@ describe('Integration Tests', () => {
     }
 
     const newIndex = indexBuffer(serialized);
-    const newStore = new RecordStore(serialized.buffer, newIndex);
+    const newStore = new MarcFile(serialized.buffer, newIndex);
 
     for (let i = 0; i < 5; i++) {
       const record = newStore.getRecord(i);
@@ -176,7 +176,7 @@ describe('Integration Tests', () => {
   it('multiple edits and reverts', () => {
     const buffer = createMultiRecordBuffer(10);
     const index = indexBuffer(buffer);
-    const store = new RecordStore(buffer.buffer, index);
+    const store = new MarcFile(buffer.buffer, index);
 
     // Modify records 2, 5, 7
     for (const i of [2, 5, 7]) {
@@ -211,7 +211,7 @@ describe('Integration Tests', () => {
     }
 
     const newIndex = indexBuffer(serialized);
-    const newStore = new RecordStore(serialized.buffer, newIndex);
+    const newStore = new MarcFile(serialized.buffer, newIndex);
 
     // Record 2 and 7 should have 500 field
     expect(newStore.getRecord(2).fields.some((f) => isDataField(f) && f.tag === '500')).toBe(true);
@@ -224,7 +224,7 @@ describe('Integration Tests', () => {
   it('sequential access pattern (cache hit optimization)', () => {
     const buffer = createMultiRecordBuffer(20);
     const index = indexBuffer(buffer);
-    const store = new RecordStore(buffer.buffer, index, 10); // Cache capacity 10
+    const store = new MarcFile(buffer.buffer, index, 10); // Cache capacity 10
 
     // Access records 0-9 (all should fit in cache)
     const firstPass: MarcRecord[] = [];

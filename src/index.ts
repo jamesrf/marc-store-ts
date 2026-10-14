@@ -1,4 +1,4 @@
-export { MarcFile, MarcFile as RecordStore } from './record-store.js';
+export { MarcFile } from './marc-file.js';
 export type { RecordResult, RecordSlot } from './types.js';
 export type {
   ReadableStore,

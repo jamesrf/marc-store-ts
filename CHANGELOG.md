@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Breaking
+- `MarcFile` now extends `EditLayer` instead of wrapping one, so it inherits every reading, editing and serialization method. The `MarcFile.edits` getter is removed (use the `MarcFile` itself).
+- The `RecordStore` alias for `MarcFile` is removed; import `MarcFile`.
+- `MarcBase.indexCount` is removed; use `totalRecords`, which is identical.
+- Internal module `record-store.ts` is renamed `marc-file.ts` (only matters if you imported from `dist/` paths directly).
 - `toMarcBinary` converts records stored as MARC-8 to UTF-8 by default, so its output never mixes encodings. Pass `{ encoding: 'preserve' }` for the previous byte-for-byte behaviour.
 - `toJson` now writes MARC-in-JSON by default. The previous shape is available as `toJson(store, { format: 'simple' })`.
 - `toMarcXml`'s `encoding` option is removed. It only changed the XML declaration, never the output, which is always UTF-8.

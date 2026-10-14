@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MarcBase, deepFreezeRecord } from '../marc-base.js';
 import { indexBuffer } from '../record-index.js';
-import { MarcFile } from '../record-store.js';
+import { MarcFile } from '../marc-file.js';
 import { createMultiRecordBuffer, createTypicalRecord } from './helpers/test-data.js';
 
 describe('deepFreezeRecord', () => {
@@ -143,16 +143,15 @@ describe('MarcBase', () => {
     });
   });
 
-  describe('totalRecords / indexCount', () => {
+  describe('totalRecords', () => {
     it('returns 0 for empty buffer', () => {
       const base = MarcBase.fromBuffer(new Uint8Array(0));
       expect(base.totalRecords).toBe(0);
-      expect(base.indexCount).toBe(0);
     });
 
-    it('totalRecords equals indexCount', () => {
+    it('counts every indexed record', () => {
       const base = MarcBase.fromBuffer(createMultiRecordBuffer(7));
-      expect(base.totalRecords).toBe(base.indexCount);
+      expect(base.totalRecords).toBe(7);
     });
   });
 

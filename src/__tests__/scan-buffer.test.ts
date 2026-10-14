@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { scanBuffer, indexBuffer } from '../record-index.js';
-import { MarcFile } from '../record-store.js';
+import { MarcFile } from '../marc-file.js';
 import { MarcBase } from '../marc-base.js';
 import { toMarcBinary } from '../transform.js';
 import {

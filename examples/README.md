@@ -52,7 +52,7 @@ npm run examples
 **What it demonstrates:**
 - Loading a MARC file from disk
 - Indexing the buffer to find record boundaries
-- Creating a RecordStore with default settings
+- Creating a MarcFile store with default settings
 - Accessing records by index
 - Displaying basic record information
 
@@ -199,15 +199,13 @@ Feel free to create your own examples based on these templates. Key patterns to 
 
 1. **Import the library:**
    ```typescript
-   import { indexBuffer, RecordStore } from 'marc-store-ts';
+   import { MarcFile } from 'marc-store-ts';
    import { /* utilities */ } from 'marc-ts';
    ```
 
 2. **Load and index:**
    ```typescript
-   const buffer = new Uint8Array(readFileSync(filePath)).buffer;
-   const index = indexBuffer(buffer);
-   const store = new RecordStore(buffer, index);
+   const store = MarcFile.fromBuffer(readFileSync(filePath));
    ```
 
 3. **Use try/catch or tryGetRecord():**

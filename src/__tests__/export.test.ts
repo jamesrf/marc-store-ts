@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { serializeMarcBinary } from 'marc-ts';
 import type { MarcRecord } from 'marc-ts';
 import { serializeMarcJson } from 'marc-ts/json';
-import { MarcFile } from '../record-store.js';
+import { MarcFile } from '../marc-file.js';
 import {
   iterateMarcXml,
   toMarcXml,

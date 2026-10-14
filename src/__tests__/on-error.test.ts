@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { appendField } from 'marc-ts';
 import type { MarcRecord } from 'marc-ts';
-import { MarcFile } from '../record-store.js';
+import { MarcFile } from '../marc-file.js';
 import { iterateRecordResults } from '../iterate.js';
 import {
   applyToAll,

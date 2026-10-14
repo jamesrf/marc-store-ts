@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MarcFile } from '../record-store.js';
+import { MarcFile } from '../marc-file.js';
 import {
   applyToAll,
   applyToMatching,

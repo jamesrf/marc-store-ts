@@ -65,9 +65,9 @@ This design ensures:
 
 ## API Documentation
 
-### MarcFile / RecordStore
+### MarcFile
 
-The main storage engine for MARC files. Exported as both `MarcFile` (primary name) and `RecordStore` (backward-compatibility alias).
+The main storage engine for MARC files. `MarcFile` is an `EditLayer` (copy-on-write edits) over a `MarcBase` (the raw buffer, record index and LRU cache), so every method below is also available on `EditLayer`.
 
 #### Static factory
 
@@ -120,7 +120,7 @@ totalRecords: number                       // Total number of records in the fil
 modifiedCount: number                      // Number of edited records
 slots: readonly Readonly<RecordSlot>[]     // Deprecated: copies every slot on each access; use getSlot/iterateSlots
 base: MarcBase                             // Advanced: underlying buffer and LRU cache layer
-edits: EditLayer                           // Advanced: copy-on-write edit layer
+indexIssues: readonly IndexIssue[]         // Problems found while indexing (see scanBuffer)
 ```
 
 #### Methods

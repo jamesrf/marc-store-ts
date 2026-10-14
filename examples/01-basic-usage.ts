@@ -4,7 +4,7 @@
  * This example demonstrates:
  * - Loading a MARC file from disk
  * - Indexing the buffer to find record boundaries
- * - Creating a RecordStore
+ * - Creating a MarcFile store
  * - Accessing records by index
  * - Displaying basic record information
  */

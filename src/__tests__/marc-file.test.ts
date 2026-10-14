@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MarcFile } from '../record-store.js';
+import { MarcFile } from '../marc-file.js';
 import { indexBuffer } from '../record-index.js';
 import { createTypicalRecord, createMultiRecordBuffer } from './helpers/test-data.js';
 import { appendField, isDataField } from 'marc-ts';
@@ -559,5 +559,17 @@ describe('MarcFile slot access', () => {
     store.deleteRecord(0);
     expect(store.getSlot(0)).toMatchObject({ kind: 'original', id: 1 });
     expect(Array.from(store.iterateSlots()).map((s) => s.kind)).toEqual(['deleted', 'original']);
+  });
+});
+
+describe('MarcFile class', () => {
+  it('is an EditLayer over a MarcBase', async () => {
+    const { EditLayer } = await import('../edit-layer.js');
+    const { MarcBase } = await import('../marc-base.js');
+    const store = MarcFile.fromBuffer(createMultiRecordBuffer(2));
+    expect(store).toBeInstanceOf(EditLayer);
+    expect(store.base).toBeInstanceOf(MarcBase);
+    expect(store.base).toBe(store.baseStore);
+    expect(store.base.totalRecords).toBe(2);
   });
 });
