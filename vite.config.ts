@@ -10,7 +10,7 @@ export default defineConfig({
       fileName: 'index',
     },
     rollupOptions: {
-      external: ['marc-ts'],
+      external: [/^marc-ts(\/.*)?$/],
     },
     outDir: 'dist',
     sourcemap: true,
