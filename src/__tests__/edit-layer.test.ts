@@ -67,14 +67,14 @@ describe('EditLayer', () => {
         subfields: [{ code: 'a', value: 'note' }],
       });
       layer.setRecord(0, modified);
-      expect(layer.getRecord(0)).toBe(modified);
+      expect(layer.getRecord(0)).toEqual(modified);
     });
 
     it('returns an inserted record at its position', () => {
       const layer = makeLayer(3);
       const inserted = createTypicalRecord('ins');
       layer.insertRecord(inserted, 1);
-      expect(layer.getRecord(2)).toBe(inserted);
+      expect(layer.getRecord(2)).toEqual(inserted);
     });
   });
 
@@ -113,7 +113,7 @@ describe('EditLayer', () => {
       layer.insertRecord(inserted, 1);
       const items = Array.from(layer.iterateRecords());
       expect(items).toHaveLength(4);
-      expect(items[2].record).toBe(inserted);
+      expect(items[2].record).toEqual(inserted);
     });
 
     it('yields nothing for an empty base', () => {
@@ -132,7 +132,7 @@ describe('EditLayer', () => {
         subfields: [{ code: 'a', value: 'x' }],
       });
       layer.setRecord(1, modified);
-      expect(layer.getRecord(1)).toBe(modified);
+      expect(layer.getRecord(1)).toEqual(modified);
     });
 
     it('increments modifiedCount when modifying an original slot', () => {
@@ -163,7 +163,7 @@ describe('EditLayer', () => {
       const replacement = createTypicalRecord('replaced');
       layer.setRecord(1, replacement);
       expect(layer.modifiedCount).toBe(1); // inserted slot, no increment
-      expect(layer.getRecord(1)).toBe(replacement);
+      expect(layer.getRecord(1)).toEqual(replacement);
     });
 
     it('throws RangeError for out-of-bounds position', () => {
@@ -177,6 +177,39 @@ describe('EditLayer', () => {
       const rec = createTypicalRecord('new');
       layer.setRecord(0, rec);
       expect(Object.isFrozen(layer.getRecord(0))).toBe(true);
+    });
+
+    it("does not freeze the caller's record object", () => {
+      const layer = makeLayer(3);
+      const rec = createTypicalRecord('mine');
+      layer.setRecord(0, rec);
+      expect(Object.isFrozen(rec)).toBe(false);
+      expect(Object.isFrozen(rec.fields)).toBe(false);
+      expect(Object.isFrozen(rec.fields[0])).toBe(false);
+      rec.fields.push({ tag: '002', data: 'later' });
+      expect(layer.getRecord(0).fields).toHaveLength(3);
+    });
+
+    it('stores an already-frozen record without copying it', () => {
+      const layer = makeLayer(3);
+      const rec = layer.getRecord(1);
+      layer.setRecord(0, rec);
+      expect(layer.getRecord(0)).toBe(rec);
+    });
+
+    it('reuses frozen fields carried over by marc-ts helpers', () => {
+      const layer = makeLayer(3);
+      const original = layer.getRecord(0);
+      const updated = appendField(original, {
+        tag: '500',
+        indicator1: ' ',
+        indicator2: ' ',
+        subfields: [{ code: 'a', value: 'note' }],
+      });
+      layer.setRecord(0, updated);
+      const stored = layer.getRecord(0);
+      expect(stored.fields[0]).toBe(original.fields[0]);
+      expect(Object.isFrozen(stored.fields[stored.fields.length - 1])).toBe(true);
     });
   });
 
@@ -248,7 +281,7 @@ describe('EditLayer', () => {
       const rec = createTypicalRecord('end');
       layer.insertRecord(rec);
       expect(layer.totalRecords).toBe(4);
-      expect(layer.getRecord(3)).toBe(rec);
+      expect(layer.getRecord(3)).toEqual(rec);
     });
 
     it('inserts after the given position', () => {
@@ -256,14 +289,14 @@ describe('EditLayer', () => {
       const rec = createTypicalRecord('mid');
       layer.insertRecord(rec, 1);
       expect(layer.totalRecords).toBe(4);
-      expect(layer.getRecord(2)).toBe(rec);
+      expect(layer.getRecord(2)).toEqual(rec);
     });
 
     it('inserts after position 0', () => {
       const layer = makeLayer(3);
       const rec = createTypicalRecord('after0');
       layer.insertRecord(rec, 0);
-      expect(layer.getRecord(1)).toBe(rec);
+      expect(layer.getRecord(1)).toEqual(rec);
     });
 
     it('increments modifiedCount', () => {
@@ -283,6 +316,14 @@ describe('EditLayer', () => {
       const rec = createTypicalRecord('f');
       layer.insertRecord(rec);
       expect(Object.isFrozen(layer.getRecord(3))).toBe(true);
+    });
+
+    it("does not freeze the caller's record object", () => {
+      const layer = makeLayer(3);
+      const rec = createTypicalRecord('f');
+      layer.insertRecord(rec);
+      expect(Object.isFrozen(rec)).toBe(false);
+      expect(Object.isFrozen(rec.fields)).toBe(false);
     });
 
     it('throws RangeError for out-of-bounds afterPosition', () => {
@@ -573,7 +614,7 @@ describe('EditLayer', () => {
       layer.insertRecord(inserted, 0); // [orig0, INS, orig1, orig2]
       layer.deleteRecord(0); // [INS, orig1, orig2]
       expect(layer.totalRecords).toBe(3);
-      expect(layer.getRecord(0)).toBe(inserted);
+      expect(layer.getRecord(0)).toEqual(inserted);
     });
   });
 });

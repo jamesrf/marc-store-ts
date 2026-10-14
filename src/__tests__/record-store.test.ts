@@ -112,7 +112,7 @@ describe('MarcFile', () => {
         subfields: [{ code: 'a', value: 'Modified note' }],
       });
       store.setRecord(0, modified);
-      expect(store.getRecord(0)).toBe(modified);
+      expect(store.getRecord(0)).toEqual(modified);
     });
 
     it('throws RangeError for negative index', () => {
@@ -185,7 +185,7 @@ describe('MarcFile', () => {
       store.insertRecord(newRecord, 1);
       const items = Array.from(store.iterateRecords());
       expect(items).toHaveLength(4);
-      expect(items[2].record).toBe(newRecord);
+      expect(items[2].record).toEqual(newRecord);
     });
   });
 
@@ -281,7 +281,7 @@ describe('MarcFile', () => {
       const newRecord = createTypicalRecord('inserted');
       store.insertRecord(newRecord, 1);
       expect(store.totalRecords).toBe(4);
-      expect(store.getRecord(2)).toBe(newRecord);
+      expect(store.getRecord(2)).toEqual(newRecord);
     });
 
     it('appends to end when no position given', () => {
@@ -289,7 +289,7 @@ describe('MarcFile', () => {
       const newRecord = createTypicalRecord('appended');
       store.insertRecord(newRecord);
       expect(store.totalRecords).toBe(4);
-      expect(store.getRecord(3)).toBe(newRecord);
+      expect(store.getRecord(3)).toEqual(newRecord);
     });
 
     it('increases modifiedCount', () => {

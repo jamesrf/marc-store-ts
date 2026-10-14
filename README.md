@@ -153,7 +153,7 @@ type RecordResult =
 
 ##### setRecord(index: number, record: MarcRecord): void
 
-Updates a record. Changes are stored in the edit layer (copy-on-write).
+Updates a record. Changes are stored in the edit layer (copy-on-write). The store keeps a deep-frozen copy, so your object is not modified and later changes to it do not affect the store; already-frozen parts (such as fields carried over from a record you read from the store) are reused rather than copied.
 
 ```typescript
 store.setRecord(0, modifiedRecord);
@@ -189,7 +189,7 @@ console.log(store.totalRecords); // one fewer than before
 
 ##### insertRecord(record: MarcRecord, afterPosition?: number): void
 
-Inserts a new record into the edit layer. If `afterPosition` is omitted, the record is appended to the end.
+Inserts a new record into the edit layer. If `afterPosition` is omitted, the record is appended to the end. As with `setRecord`, the store keeps a frozen copy and does not modify your object.
 
 ```typescript
 store.insertRecord(newRecord);               // append

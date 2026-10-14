@@ -22,6 +22,38 @@ export function deepFreezeRecord(record: MarcRecord): MarcRecord {
   return record;
 }
 
+type Field = MarcRecord['fields'][number];
+
+function isFrozenField(field: Field): boolean {
+  if (!Object.isFrozen(field)) return false;
+  if (!('subfields' in field)) return true;
+  return Object.isFrozen(field.subfields) && field.subfields.every((s) => Object.isFrozen(s));
+}
+
+function copyField(field: Field): Field {
+  if (isFrozenField(field)) return field;
+  return 'subfields' in field
+    ? { ...field, subfields: field.subfields.map((s) => ({ ...s })) }
+    : { ...field };
+}
+
+/**
+ * Return a deep-frozen record equal to `record`, without freezing the
+ * caller's objects. Parts that are already frozen (for example a record
+ * read from the store, or fields that marc-ts helpers carried over from one)
+ * are reused rather than copied.
+ */
+export function toFrozenRecord(record: MarcRecord): MarcRecord {
+  if (
+    Object.isFrozen(record) &&
+    Object.isFrozen(record.fields) &&
+    record.fields.every(isFrozenField)
+  ) {
+    return record;
+  }
+  return deepFreezeRecord({ ...record, fields: record.fields.map(copyField) });
+}
+
 export class MarcBase implements ReadableStore {
   private readonly rawBuffer: ArrayBuffer;
   private readonly rawBufferOffset: number;

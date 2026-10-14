@@ -1,7 +1,7 @@
 import type { MarcRecord } from 'marc-ts';
 import { serializeMarcBinary } from 'marc-ts';
 import type { MarcBase } from './marc-base.js';
-import { deepFreezeRecord } from './marc-base.js';
+import { toFrozenRecord } from './marc-base.js';
 import type { RecordResult, RecordSlot, EditableStore } from './types.js';
 
 export class EditLayer implements EditableStore {
@@ -70,7 +70,7 @@ export class EditLayer implements EditableStore {
   // ========== Editing ==========
 
   setRecord(position: number, record: MarcRecord): void {
-    record = deepFreezeRecord(record);
+    record = toFrozenRecord(record);
     const slotIndex = this._slotIndexAt(position);
     if (slotIndex === -1) {
       throw new RangeError(`Record index ${position} out of range [0, ${this.totalRecords})`);
@@ -105,7 +105,7 @@ export class EditLayer implements EditableStore {
   }
 
   insertRecord(record: MarcRecord, afterPosition?: number): void {
-    record = deepFreezeRecord(record);
+    record = toFrozenRecord(record);
     if (afterPosition === undefined) {
       this._slots.push({ kind: 'inserted', record });
       this._totalRecords++;
