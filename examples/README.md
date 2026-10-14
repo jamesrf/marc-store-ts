@@ -4,94 +4,45 @@ This directory contains practical examples demonstrating how to use `marc-store-
 
 ## Prerequisites
 
-Before running these examples, you'll need:
-
-1. **Node.js 18+** installed
-2. **Sample MARC data files** to work with
+- **Node.js 22+** (the examples are TypeScript and run directly with Node's type stripping)
+- A MARC21 file to work with: either generate one (below) or use your own
 
 ## Getting Sample MARC Data
 
-You can obtain sample MARC files from several sources:
+### Option 1: Generate synthetic data
 
-### Option 1: Library of Congress
-Download sample bibliographic records from the Library of Congress:
-- [MARC 21 Sample Records](https://www.loc.gov/cds/downloads/MARC/)
+[`generate-sample-data.ts`](./generate-sample-data.ts) writes a file of synthetic records with titles, authors, ISBNs and subjects:
 
-### Option 2: Create Your Own
-Use the `marc-ts` library to create sample records programmatically:
-
-```typescript
-import { writeFileSync } from 'fs';
-import { serializeRecord, MarcRecord } from 'marc-ts';
-
-const sampleRecord: MarcRecord = {
-  leader: '00000nam  2200000   4500',
-  controlFields: [
-    { tag: '001', value: '123456' },
-    { tag: '008', value: '240101s2024    xx            000 0 eng d' }
-  ],
-  dataFields: [
-    {
-      tag: '245',
-      indicator1: '0',
-      indicator2: '0',
-      subfields: [
-        { code: 'a', value: 'Sample Title' },
-        { code: 'c', value: 'Sample Author' }
-      ]
-    }
-  ]
-};
-
-const serialized = serializeRecord(sampleRecord);
-writeFileSync('sample-data.mrc', serialized);
+```bash
+node --experimental-strip-types examples/generate-sample-data.ts sample-data.mrc 500
 ```
 
-### Option 3: Use Test Data
-Check the project's test files for sample data generation helpers:
-- `src/__tests__/helpers/test-data.ts` contains utility functions for creating test records
+### Option 2: Library of Congress
+
+Download real bibliographic records from the Library of Congress:
+- [MARC 21 Sample Records](https://www.loc.gov/cds/downloads/MARC/)
 
 ## Running the Examples
 
-### Setup
+The examples import `marc-store-ts` by package name, which resolves to the built `dist/`, so build first:
 
-1. Clone the repository and install dependencies:
 ```bash
-git clone <repository-url>
+git clone https://github.com/jamesrf/marc-store-ts.git
 cd marc-store-ts
 npm install
 npm run build
 ```
 
-2. Place your sample MARC file in the project root or examples directory:
+Then run any example, passing the MARC file as the first argument (default: `sample-data.mrc` in the current directory):
+
 ```bash
-cp /path/to/your/data.mrc ./sample-data.mrc
+node --experimental-strip-types examples/01-basic-usage.ts sample-data.mrc
 ```
 
-### Running Individual Examples
-
-Each example can be run with `ts-node` or compiled and run with Node.js:
-
-#### Using ts-node (recommended for development)
+To generate sample data and run every example in one step:
 
 ```bash
-npm install -g ts-node
-
-# Run with default sample file (sample-data.mrc)
-ts-node examples/01-basic-usage.ts
-
-# Run with a specific file
-ts-node examples/01-basic-usage.ts /path/to/your/data.mrc
-```
-
-#### Using compiled JavaScript
-
-```bash
-# Compile the examples
-npx tsc examples/*.ts --outDir examples/dist --module es2020 --target es2020 --moduleResolution node
-
-# Run compiled examples
-node examples/dist/01-basic-usage.js /path/to/your/data.mrc
+npm run examples
 ```
 
 ## Example Descriptions
@@ -107,7 +58,7 @@ node examples/dist/01-basic-usage.js /path/to/your/data.mrc
 
 **Usage:**
 ```bash
-ts-node examples/01-basic-usage.ts [path-to-marc-file]
+node --experimental-strip-types examples/01-basic-usage.ts [path-to-marc-file]
 ```
 
 **Output:** Summary of the file, record count, and first few record titles
@@ -126,7 +77,7 @@ ts-node examples/01-basic-usage.ts [path-to-marc-file]
 
 **Usage:**
 ```bash
-ts-node examples/02-editing-records.ts [path-to-marc-file]
+node --experimental-strip-types examples/02-editing-records.ts [path-to-marc-file]
 ```
 
 **Output:** Step-by-step log of edit operations and modification tracking
@@ -144,10 +95,10 @@ ts-node examples/02-editing-records.ts [path-to-marc-file]
 
 **Usage:**
 ```bash
-ts-node examples/03-serialization.ts [input-file] [output-file]
+node --experimental-strip-types examples/03-serialization.ts [input-file] [output-file]
 
 # Defaults:
-ts-node examples/03-serialization.ts sample-data.mrc output.mrc
+node --experimental-strip-types examples/03-serialization.ts sample-data.mrc output.mrc
 ```
 
 **Output:** Creates a new MARC file with modifications and verifies it
@@ -165,7 +116,7 @@ ts-node examples/03-serialization.ts sample-data.mrc output.mrc
 
 **Usage:**
 ```bash
-ts-node examples/04-safe-error-handling.ts [path-to-marc-file]
+node --experimental-strip-types examples/04-safe-error-handling.ts [path-to-marc-file]
 ```
 
 **Output:** Demonstrates safe error handling in various scenarios
@@ -184,7 +135,7 @@ ts-node examples/04-safe-error-handling.ts [path-to-marc-file]
 
 **Usage:**
 ```bash
-ts-node examples/05-large-files.ts [path-to-large-marc-file]
+node --experimental-strip-types examples/05-large-files.ts [path-to-large-marc-file]
 ```
 
 **Output:** Performance metrics, memory usage analysis, and optimization recommendations
@@ -204,17 +155,17 @@ ts-node examples/05-large-files.ts [path-to-large-marc-file]
 
 **Usage:**
 ```bash
-ts-node examples/06-full-text-search.ts [path-to-marc-file] [search-term] [isbn]
+node --experimental-strip-types examples/06-full-text-search.ts [path-to-marc-file] [search-term] [isbn]
 
 # Defaults:
-ts-node examples/06-full-text-search.ts sample-data.mrc history
+node --experimental-strip-types examples/06-full-text-search.ts sample-data.mrc history
 ```
 
 **Output:** Search results for a general query, a field-scoped query, and an ISBN lookup, plus a demonstration of index rebuilding after deleting records
 
 ## Example Output Location
 
-- Examples 01, 02, 04, 05, 06: Read-only (no files created)
+- Examples 01, 02, 04, 06: Read-only (no files created)
 - Example 03: Creates `output.mrc` (or custom output file)
 - Example 05: Creates `output-large.mrc`
 
@@ -227,16 +178,11 @@ Make sure you've built the project first:
 npm run build
 ```
 
-Alternatively, use `ts-node` with the `--project` flag:
-```bash
-ts-node --project tsconfig.json examples/01-basic-usage.ts
-```
-
 ### "File not found" error
 
 Specify the full path to your MARC file:
 ```bash
-ts-node examples/01-basic-usage.ts /full/path/to/data.mrc
+node --experimental-strip-types examples/01-basic-usage.ts /full/path/to/data.mrc
 ```
 
 ### TypeScript errors

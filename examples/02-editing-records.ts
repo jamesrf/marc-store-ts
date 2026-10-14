@@ -33,9 +33,7 @@ const withNote = appendField(record0, {
   tag: '500',
   indicator1: ' ',
   indicator2: ' ',
-  subfields: [
-    { code: 'a', value: 'This record has been modified by marc-store-ts example.' }
-  ]
+  subfields: [{ code: 'a', value: 'This record has been modified by marc-store-ts example.' }],
 });
 
 store.setRecord(0, withNote);
@@ -56,9 +54,7 @@ if (store.totalRecords > 1) {
       tag: '500',
       indicator1: ' ',
       indicator2: ' ',
-      subfields: [
-        { code: 'a', value: 'Updated note field.' }
-      ]
+      subfields: [{ code: 'a', value: 'Updated note field.' }],
     });
 
     store.setRecord(1, updated);

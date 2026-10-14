@@ -15,7 +15,6 @@ A TypeScript library designed to handle large MARC bibliographic files (50K-250K
 - **Copy-on-Write Editing**: Edit records without modifying the original buffer
 - **Zero-Copy Serialization**: Unmodified records are serialized as buffer views (no re-parsing)
 - **Type-Safe API**: Uses discriminated unions for safe error handling
-- **High Performance**: < 0.1ms cache hits, < 10ms cache misses, < 100ms indexing per 1000 records
 - **Full-Text Search**: Pure-JS `SearchIndex` for querying by title, author, subject, or any custom field combination — works identically in Node and the browser
 
 ## Installation
@@ -46,22 +45,20 @@ console.log(`Total records: ${store.totalRecords}`);
 
 ## Architecture
 
-The library uses a **4-layer architecture** for efficient record management:
+`MarcFile` is a thin facade over two classes:
 
 ```
-Layer 1: rawBuffer (immutable buffer - entire MARC file)
-           ↓
-Layer 2: recordIndex (lightweight array of record positions/sizes)
-           ↓
-Layer 3: cache (LRU cache of recently accessed parsed records)
-           ↓
-Layer 4: edits (slot-based edit layer - copy-on-write)
+MarcFile
+├── EditLayer   slot array (original / modified / deleted / inserted) — copy-on-write edits
+└── MarcBase    raw buffer + record index (offset/length per record) + LRU cache of parsed records
 ```
 
-**Record Retrieval Priority**: edits (slots) → cache → parse from buffer
+`indexBuffer()` scans the raw buffer once, reading only each record's 5-byte length, to build the record index. Records are parsed on first access and cached.
+
+**Record retrieval**: an edited slot returns its stored record; an original slot is served from the LRU cache, or parsed from the buffer on a miss.
 
 This design ensures:
-- Original file data is never modified (immutable buffer)
+- The library never writes to the original buffer
 - Only recently used records consume memory
 - Edits are tracked separately without duplicating unmodified data
 - Serialization can reuse original buffer data for unmodified records
@@ -610,13 +607,15 @@ for (let i = 0; i < store.totalRecords; i++) {
 
 ## Performance Characteristics
 
-| Operation | Time | Notes |
+| Operation | Cost | Notes |
 |-----------|------|-------|
-| Index 1000 records | < 100ms | Scales linearly (extrapolates to ~10s for 100K records) |
-| Cache hit | < 0.1ms | Record already in LRU cache |
-| Cache miss | < 10ms | Parse from buffer on first access |
-| Serialization (unmodified) | ~0ms per record | Zero-copy: yields buffer view |
-| Serialization (modified) | < 10ms per record | Re-serializes edited records |
+| Indexing | O(n), no parsing | Reads only the 5-byte length of each record |
+| Cache hit | O(1) | Record already in LRU cache |
+| Cache miss | One record parse | Parsed from the buffer on first access |
+| Serialization (unmodified) | Zero-copy | Yields a view into the original buffer |
+| Serialization (modified) | One record serialize | Re-serializes edited/inserted records only |
+
+Benchmarked timings will be published once a benchmark suite is added.
 
 ### Memory Usage
 
@@ -663,27 +662,31 @@ npm run test:coverage
 # Lint
 npm run lint
 
-# Type check
+# Type check (library and examples)
 npm run type-check
+
+# Run every example against generated sample data (requires a build)
+npm run build && npm run examples
 ```
 
 ### Scripts
 
 - `build` - Compile TypeScript to JavaScript (ESM)
-- `test` - Run tests once with Vitest
-- `test` - Run tests (single run in CI; interactive watch in terminal via `npx vitest --watch`)
+- `test` - Run Vitest (watch mode in a terminal, single run in CI)
 - `test:coverage` - Generate code coverage report
-- `lint` - Lint source code with ESLint
-- `type-check` - Type checking without emitting files
+- `lint` / `lint:fix` - Lint `src/` and `examples/` with ESLint
+- `format` / `format:check` - Format `src/` and `examples/` with Prettier
+- `type-check` - Type-check the library and the examples without emitting files
+- `examples` - Generate sample data and run every example against it
 
 ## Requirements
 
-- Node.js 22+ recommended (20.19+ minimum; required by Vite 7)
+- Node.js 22+
 - TypeScript 5.0+ (if using in TypeScript projects)
 
 ## License
 
-MIT
+[MIT](./LICENSE)
 
 ## Contributing
 
@@ -691,4 +694,4 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## Related Projects
 
-- [marc-ts](https://github.com/thisismarcio/marc-ts) - TypeScript MARC parsing and serialization library
+- [marc-ts](https://github.com/jamesrf/marc-ts) - TypeScript MARC parsing and serialization library

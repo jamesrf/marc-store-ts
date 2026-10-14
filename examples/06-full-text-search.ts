@@ -10,7 +10,13 @@
  */
 
 import { readFileSync } from 'fs';
-import { indexBuffer, MarcFile, SearchIndex, DEFAULT_SEARCH_FIELDS, deleteMatching } from 'marc-store-ts';
+import {
+  indexBuffer,
+  MarcFile,
+  SearchIndex,
+  DEFAULT_SEARCH_FIELDS,
+  deleteMatching,
+} from 'marc-store-ts';
 import { isbn, isDataField } from 'marc-ts';
 
 // Load and index MARC file
@@ -45,7 +51,9 @@ function printResults(results: ReturnType<SearchIndex['search']>) {
 console.log('--- Example 1: Building the Default Index ---');
 const index = new SearchIndex();
 index.build(store);
-console.log(`Indexed ${index.size} records across fields: ${DEFAULT_SEARCH_FIELDS.map((f) => f.name).join(', ')}`);
+console.log(
+  `Indexed ${index.size} records across fields: ${DEFAULT_SEARCH_FIELDS.map((f) => f.name).join(', ')}`
+);
 
 // Example 2: Query by a general term (searches title/author/subjects/contents)
 console.log('\n--- Example 2: General Query ---');

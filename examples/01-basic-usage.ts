@@ -48,10 +48,11 @@ for (let i = 0; i < Math.min(5, store.totalRecords); i++) {
   const record = store.getRecord(i);
   const time = Date.now() - start;
 
-  const titleField = record.fields.find(f => f.tag === '245');
-  const titleValue = (titleField && isDataField(titleField))
-    ? (titleField.subfields.find(s => s.code === 'a')?.value ?? 'No title')
-    : 'No title';
+  const titleField = record.fields.find((f) => f.tag === '245');
+  const titleValue =
+    titleField && isDataField(titleField)
+      ? (titleField.subfields.find((s) => s.code === 'a')?.value ?? 'No title')
+      : 'No title';
 
   console.log(`Record ${i}: "${titleValue.substring(0, 50)}" (${time}ms)`);
 }
@@ -60,4 +61,4 @@ for (let i = 0; i < Math.min(5, store.totalRecords); i++) {
 console.log('\n--- Summary ---');
 console.log(`Total records: ${store.totalRecords}`);
 console.log(`Modified records: ${store.modifiedCount}`);
-console.log(`Index size: ${(recordIndex.length * 16 / 1024).toFixed(2)} KB (approx)`);
+console.log(`Index size: ${((recordIndex.length * 16) / 1024).toFixed(2)} KB (approx)`);

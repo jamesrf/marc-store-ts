@@ -67,7 +67,7 @@ for (let i = 0; i < recordsToProcess; i++) {
     successCount++;
     // Process the record here
     // Example: extract title
-    const title = result.record.fields.find(f => f.tag === '245' && isDataField(f));
+    const title = result.record.fields.find((f) => f.tag === '245' && isDataField(f));
     if (!title) {
       // Could track records without titles if needed
     }
@@ -97,14 +97,14 @@ console.log('\n--- Example 4: Comparison with getRecord() ---');
 console.log('Using getRecord() (may throw):');
 try {
   const record = store.getRecord(0);
-  console.log('✓ Record 0 retrieved successfully');
+  console.log(`✓ Record 0 retrieved successfully (${record.fields.length} fields)`);
 } catch (error) {
   console.log(`✗ Exception caught: ${error}`);
 }
 
 console.log('\nTrying to access invalid record with getRecord():');
 try {
-  const record = store.getRecord(store.totalRecords + 100);
+  store.getRecord(store.totalRecords + 100);
   console.log('✓ Record retrieved (unexpected)');
 } catch (error) {
   console.log(`✗ Exception caught: ${error instanceof Error ? error.message : error}`);
@@ -121,10 +121,11 @@ function processRecord(store: MarcFile, index: number): string {
   }
 
   // TypeScript knows result.record exists here
-  const titleField = result.record.fields.find(f => f.tag === '245');
-  const title = (titleField && isDataField(titleField))
-    ? (titleField.subfields.find(s => s.code === 'a')?.value ?? 'No title')
-    : 'No title';
+  const titleField = result.record.fields.find((f) => f.tag === '245');
+  const title =
+    titleField && isDataField(titleField)
+      ? (titleField.subfields.find((s) => s.code === 'a')?.value ?? 'No title')
+      : 'No title';
 
   return `Title: ${title}`;
 }

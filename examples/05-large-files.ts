@@ -28,7 +28,7 @@ const indexTime = Date.now() - indexStart;
 
 console.log(`Indexed ${recordIndex.length} records in ${indexTime}ms`);
 console.log(`Average: ${(indexTime / recordIndex.length).toFixed(3)}ms per record`);
-console.log(`Index memory: ~${(recordIndex.length * 16 / 1024).toFixed(2)} KB`);
+console.log(`Index memory: ~${((recordIndex.length * 16) / 1024).toFixed(2)} KB`);
 
 // Strategy 1: Sequential access with small cache
 console.log('\n--- Strategy 1: Sequential Access (Small Cache) ---');
@@ -79,7 +79,7 @@ for (let i = 0; i < Math.min(1000, recordIndex.length); i++) {
   if (Math.random() < 0.7 && accessedIndices.size > 0) {
     // Re-access a recent record
     const recentArray = Array.from(accessedIndices).slice(-100);
-    index = recentArray[Math.floor(Math.random() * recentArray.length)];
+    index = recentArray[Math.floor(Math.random() * recentArray.length)]!;
   } else {
     // Access a new record
     index = Math.floor(Math.random() * Math.min(10000, recordIndex.length));
@@ -94,9 +94,13 @@ for (let i = 0; i < Math.min(1000, recordIndex.length); i++) {
 }
 
 const randomTime = Date.now() - randomStart;
-console.log(`Processed ${randomHits} accesses to ${accessedIndices.size} unique records in ${randomTime}ms`);
+console.log(
+  `Processed ${randomHits} accesses to ${accessedIndices.size} unique records in ${randomTime}ms`
+);
 console.log(`Average: ${(randomTime / randomHits).toFixed(3)}ms per access`);
-console.log(`Cache efficiency: ${((randomHits - accessedIndices.size) / randomHits * 100).toFixed(1)}% cache hit rate`);
+console.log(
+  `Cache efficiency: ${(((randomHits - accessedIndices.size) / randomHits) * 100).toFixed(1)}% cache hit rate`
+);
 
 // Strategy 3: Memory-efficient editing
 console.log('\n--- Strategy 3: Memory-Efficient Editing ---');
@@ -112,9 +116,11 @@ console.log(`Modifying ${modifyCount} records (1% of file)...`);
 // Note: In a real scenario, you'd actually modify records here
 // For this example, we just demonstrate the memory characteristics
 console.log(`\nMemory characteristics:`);
-console.log(`  Base index: ~${(recordIndex.length * 16 / 1024).toFixed(2)} KB`);
-console.log(`  Cache (200 records): ~${(200 * 2000 / 1024).toFixed(2)} KB (estimated)`);
-console.log(`  Edit layer (${modifyCount} modified): ~${(modifyCount * 2000 / 1024).toFixed(2)} KB (estimated)`);
+console.log(`  Base index: ~${((recordIndex.length * 16) / 1024).toFixed(2)} KB`);
+console.log(`  Cache (200 records): ~${((200 * 2000) / 1024).toFixed(2)} KB (estimated)`);
+console.log(
+  `  Edit layer (${modifyCount} modified): ~${((modifyCount * 2000) / 1024).toFixed(2)} KB (estimated)`
+);
 console.log(`  Original buffer: Not duplicated (immutable)`);
 
 // Strategy 4: Streaming serialization
@@ -137,14 +143,18 @@ for (const chunk of editStore.iterateSerializedRecords()) {
 
   // Progress indicator for large files
   if (chunkCount % 10000 === 0) {
-    console.log(`  Streamed ${chunkCount} records (${(bytesWritten / 1024 / 1024).toFixed(2)} MB)...`);
+    console.log(
+      `  Streamed ${chunkCount} records (${(bytesWritten / 1024 / 1024).toFixed(2)} MB)...`
+    );
   }
 }
 
 writeStream.end();
 
 const streamTime = Date.now() - streamStart;
-console.log(`Streamed ${chunkCount} records (${(bytesWritten / 1024 / 1024).toFixed(2)} MB) in ${streamTime}ms`);
+console.log(
+  `Streamed ${chunkCount} records (${(bytesWritten / 1024 / 1024).toFixed(2)} MB) in ${streamTime}ms`
+);
 console.log(`Average: ${(streamTime / chunkCount).toFixed(3)}ms per record`);
 
 // Performance recommendations

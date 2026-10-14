@@ -38,8 +38,8 @@ for (let i = 0; i < modifyCount; i++) {
       indicator1: ' ',
       indicator2: ' ',
       subfields: [
-        { code: 'a', value: `Modified in serialization example at ${new Date().toISOString()}` }
-      ]
+        { code: 'a', value: `Modified in serialization example at ${new Date().toISOString()}` },
+      ],
     });
 
     store.setRecord(recordPos, modified);
@@ -102,14 +102,14 @@ if (verifyIndex.length === store.totalRecords) {
 const verifyStore = new MarcFile(verifyBuffer, verifyIndex);
 for (let i = 0; i < store.totalRecords; i++) {
   if (store.isModified(i)) {
-    const original = store.getRecord(i);
     const verified = verifyStore.getRecord(i);
 
     // Check if the modification is present (look for our added 500 field)
-    const has500 = verified.fields.some(f =>
-      f.tag === '500' &&
-      isDataField(f) &&
-      f.subfields.some(s => s.value.includes('serialization example'))
+    const has500 = verified.fields.some(
+      (f) =>
+        f.tag === '500' &&
+        isDataField(f) &&
+        f.subfields.some((s) => s.value.includes('serialization example'))
     );
 
     if (has500) {
