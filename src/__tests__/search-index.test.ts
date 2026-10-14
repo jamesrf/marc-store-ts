@@ -4,7 +4,11 @@ import { getField, isDataField } from 'marc-ts';
 import { MarcFile } from '../record-store.js';
 import { deleteMatching } from '../transform.js';
 import { SearchIndex, DEFAULT_SEARCH_FIELDS } from '../search-index.js';
-import { createMultiRecordBuffer, serializeRecord } from './helpers/test-data.js';
+import {
+  createMultiRecordBuffer,
+  createTypicalRecord,
+  serializeRecord,
+} from './helpers/test-data.js';
 
 function recordWith(fields: MarcRecord['fields']): MarcRecord {
   return { leader: '00000nam  2200000   4500', fields };
@@ -169,5 +173,92 @@ describe('DEFAULT_SEARCH_FIELDS', () => {
     expect(titleField!.extract(minimal)).toEqual([]);
     expect(authorField!.extract(minimal)).toEqual([]);
     expect(subjectsField!.extract(minimal)).toEqual([]);
+  });
+});
+
+describe('SearchIndex with edits after build', () => {
+  const twoBooks = () => MarcFile.fromBuffer(bufferFrom([catcherRecord, mobyDickRecord]));
+
+  it('returns stable IDs alongside positions', () => {
+    const store = twoBooks();
+    const index = new SearchIndex();
+    index.build(store);
+    const [hit] = index.search('melville');
+    expect(hit).toMatchObject({ id: 1, position: 1 });
+  });
+
+  it('follows position shifts from inserts and deletes without a rebuild', () => {
+    const store = twoBooks();
+    const index = new SearchIndex();
+    index.build(store);
+    store.insertRecord(createTypicalRecord('new'), 0);
+    store.insertRecord(createTypicalRecord('new2'), 0);
+    const [hit] = index.search('melville');
+    expect(hit!.position).toBe(3);
+    expect(store.getRecord(hit!.position).fields).toEqual(mobyDickRecord.fields);
+  });
+
+  it('leaves deleted records out of results', () => {
+    const store = twoBooks();
+    const index = new SearchIndex();
+    index.build(store);
+    store.deleteRecord(1);
+    expect(index.search('melville')).toEqual([]);
+    store.revert(1);
+    expect(index.search('melville').map((r) => r.position)).toEqual([1]);
+  });
+
+  it('applies limit after leaving out deleted records', () => {
+    const store = twoBooks();
+    const index = new SearchIndex();
+    index.build(store);
+    store.deleteRecord(0);
+    expect(index.search('fiction', 1).map((r) => r.id)).toEqual([1]);
+  });
+
+  it('add(id) indexes new content for an edited record', () => {
+    const store = twoBooks();
+    const index = new SearchIndex();
+    index.build(store);
+    store.setRecord(0, mobyDickRecord);
+    index.add(store.idAt(0), store.getRecord(0));
+    expect(
+      index
+        .search('melville')
+        .map((r) => r.position)
+        .sort()
+    ).toEqual([0, 1]);
+    expect(index.size).toBe(2);
+  });
+
+  it('add(id) makes an inserted record searchable at its current position', () => {
+    const store = twoBooks();
+    const index = new SearchIndex();
+    index.build(store);
+    store.insertRecord(catcherRecord, 0);
+    index.add(store.idAt(1), store.getRecord(1));
+    expect(
+      index
+        .search('salinger')
+        .map((r) => r.position)
+        .sort()
+    ).toEqual([0, 1]);
+  });
+
+  it('uses positions as IDs for a store without ID support', () => {
+    const store = twoBooks();
+    const plain = {
+      get totalRecords() {
+        return store.totalRecords;
+      },
+      getRecord: (p: number) => store.getRecord(p),
+      tryGetRecord: (p: number) => store.tryGetRecord(p),
+      iterateRecords: () => store.iterateRecords(),
+      iterateSerializedRecords: () => store.iterateSerializedRecords(),
+      getSerializedRecord: (p: number) => store.getSerializedRecord(p),
+    };
+    const index = new SearchIndex();
+    index.build(plain);
+    expect(index.search('melville')).toMatchObject([{ id: 1, position: 1 }]);
   });
 });

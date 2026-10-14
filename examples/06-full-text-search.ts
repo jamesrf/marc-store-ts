@@ -62,14 +62,15 @@ console.log(`Searching for "${query}"...`);
 printResults(index.search(query));
 
 // Example 3: Keep the index in sync after a batch of edits
-console.log('\n--- Example 3: Rebuild After Edits ---');
+console.log('\n--- Example 3: Search After Edits ---');
 console.log('Deleting records whose leader marks them as type "u" (unknown)...');
 const deleted = deleteMatching(store, (record) => record.leader[6] === 'u');
 console.log(`Deleted ${deleted} record(s); ${store.totalRecords} remain`);
 
-console.log('Rebuilding the index to stay in sync with the edited store...');
-index.rebuild(store);
-console.log(`Index now covers ${index.size} records (positions renumbered after deletion)`);
+// No rebuild needed for deletions: results follow the store's current
+// positions and leave out deleted records. Rebuild after content edits.
+console.log(`Search results now cover the ${store.totalRecords} remaining records`);
+printResults(index.search(query));
 
 // Example 4: Multiple independent, field-scoped indexes
 console.log('\n--- Example 4: Field-Scoped Indexes ---');

@@ -384,18 +384,24 @@ Titles and subjects are boosted higher than general contents by default (configu
 
 ### Keeping the index in sync after edits
 
-`SearchIndex` does not observe `setRecord`/`deleteRecord`/`insertRecord` automatically — there are no mutation hooks on the edit layer. The supported pattern is to rebuild the index after a batch of edits finishes:
+Results are keyed by each record's [stable ID](#stable-record-ids), and `search()` translates IDs into the store's **current** positions. Each result is `{ id, position, score, match }`. So:
+
+- **Inserts and deletes need no action.** Positions in results follow the store, and deleted records drop out of the results (and come back if you `revert` them).
+- **Content edits** (`setRecord`, `applyToAll`, ...) aren't seen until you re-index. For a few records, use `add(id, record)`; after a large batch, `rebuild(store)`:
 
 ```typescript
-import { applyToAll, deleteMatching } from 'marc-store-ts';
+import { applyToAll } from 'marc-store-ts';
 
-deleteMatching(store, record => record.leader[6] === 'u');
+store.setRecord(5, edited);
+index.add(store.idAt(5), store.getRecord(5));   // re-index one record
+
 applyToAll(store, record => /* ... */ record);
-
-index.rebuild(store); // re-indexes from the store's current state
+index.rebuild(store);                            // re-index everything
 ```
 
-This is a full re-index (`O(totalRecords)`), but it sidesteps a subtlety: record `position` values shift when records are deleted or inserted. Because the index is always rebuilt together with the store, `position` values returned by `search()` are never stale.
+Inserted records are not searchable until added: `index.add(store.idAt(position), record)`. `remove(id)` takes an entry out of the index; it isn't needed after a delete.
+
+`SearchIndex` works with any `ReadableStore`. For a store without stable IDs, IDs are positions, and you should rebuild after inserts or deletes.
 
 ### Multiple, field-scoped indexes
 

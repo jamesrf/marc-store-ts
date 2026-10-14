@@ -21,11 +21,13 @@ All notable changes to this project are documented here. The format is based on
 - `examples/generate-sample-data.ts` and an `npm run examples` script that runs every example in CI.
 
 ### Changed
+- `SearchIndex` keys documents by stable record ID. `search()` results gain an `id` and report each record's current `position`, leave out records deleted since the build, and stay correct after inserts and deletes without a rebuild. `add()` and `remove()` now take a record ID (for an unedited store, ID and position are the same, so existing calls behave as before).
 - Minimum Node.js version is now 22 (was 24); CI tests Node 22, 24 and 26.
 - Examples are now type-checked, linted and formatted alongside `src/`.
 - The release workflow reuses the CI checks and publishes the exact tarball that passed them.
 
 ### Fixed
+- `SearchIndex` results pointed at the wrong record (or past the end) after any insert or delete until the index was rebuilt.
 - `deleteMatching` / `keepMatching` were quadratic (each delete rebuilt the position map): 4.7 s for 50K records. They now use `deleteRecords` and take 0.18 s, scaling linearly.
 - Records with a wrong leader length are now indexed by their 0x1D record terminator (reported as `length-mismatch`), parsed with the length corrected, and written out with a corrected leader. Previously one bad length made the record unparseable and stopped indexing, losing every record after it.
 - Docs: `revertRecord` was documented as restoring deleted records, which it cannot do (a deleted record has no position). Use the new `revert(id)`.

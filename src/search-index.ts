@@ -2,7 +2,7 @@ import MiniSearch from 'minisearch';
 import type { SearchOptions } from 'minisearch';
 import { getFieldsByPattern, isDataField, subjects, title, author } from 'marc-ts';
 import type { MarcRecord } from 'marc-ts';
-import type { ReadableStore } from './types.js';
+import type { IdentifiedStore, ReadableStore, RecordId } from './types.js';
 import { iterateReadableRecords } from './iterate.js';
 import type { RecordErrorOptions } from './iterate.js';
 
@@ -33,6 +33,9 @@ export interface SearchIndexOptions {
 }
 
 export interface SearchResultItem {
+  /** The record's stable ID (see `RecordId`); equal to its position for stores without IDs. */
+  id: RecordId;
+  /** The record's position in the store now, for `store.getRecord(position)`. */
   position: number;
   score: number;
   match: Record<string, string[]>;
@@ -85,18 +88,23 @@ export const DEFAULT_SEARCH_FIELDS: SearchFieldExtractor[] = [
 
 const DEFAULT_BOOST: Record<string, number> = { title: 2, author: 1.5, subjects: 1.5, contents: 1 };
 
+function hasIds(store: ReadableStore): store is ReadableStore & IdentifiedStore {
+  const candidate = store as Partial<IdentifiedStore>;
+  return typeof candidate.idAt === 'function' && typeof candidate.positionOf === 'function';
+}
+
 /**
  * In-memory full-text search index over a ReadableStore's records, backed by
- * MiniSearch. Additive to the existing store architecture — build/rebuild
- * from a store snapshot via iterateRecords(); nothing here mutates the store.
+ * MiniSearch. Built from a snapshot of the store via iterateRecords();
+ * nothing here mutates the store.
  *
- * Indexes are keyed by `position` (the same number ReadableStore/EditableStore
- * use elsewhere), not by MARC control number (001), since 001 is a cataloging
- * convention rather than a guarantee (often missing/duplicated in real data).
- * Because the supported sync pattern is a full rebuild() after a batch of
- * edits, position values in the index are never stale relative to the store
- * they were built from — the index and the store's position numbering are
- * always regenerated together.
+ * Documents are keyed by stable record ID (`RecordId`), not by position or by
+ * MARC control number (001, often missing or duplicated in real data).
+ * `search()` translates IDs to current positions using the store from the
+ * last build(), so results stay correct when records are inserted or deleted
+ * afterwards: deleted records drop out of the results, and positions reflect
+ * the store's current numbering. Content changes (setRecord) are not picked
+ * up until the record is re-added with add() or the index is rebuilt.
  *
  * Multiple independent SearchIndex instances can be built over the same
  * store, each scoped to different fields, to get separately queryable
@@ -112,6 +120,7 @@ export class SearchIndex {
   ) => string | string[] | null | undefined | false;
   private mini: MiniSearch<IndexedDocument>;
   private _size = 0;
+  private store: ReadableStore | null = null;
 
   constructor(options: SearchIndexOptions = {}) {
     this.fields = options.fields ?? DEFAULT_SEARCH_FIELDS;
@@ -140,8 +149,8 @@ export class SearchIndex {
     return this._size;
   }
 
-  private toDocument(position: number, record: MarcRecord): IndexedDocument {
-    const doc: IndexedDocument = { id: position };
+  private toDocument(id: RecordId, record: MarcRecord): IndexedDocument {
+    const doc: IndexedDocument = { id };
     for (const field of this.fields) {
       doc[field.name] = field.extract(record).join(' ');
     }
@@ -159,34 +168,34 @@ export class SearchIndex {
    */
   build(store: ReadableStore, options: RecordErrorOptions = {}): void {
     this.mini = this.newMiniSearch();
+    this.store = store;
+    const idAt = hasIds(store) ? (position: number) => store.idAt(position) : (p: number) => p;
     const docs: IndexedDocument[] = [];
     for (const { index, record } of iterateReadableRecords(store, options.onError)) {
-      docs.push(this.toDocument(index, record));
+      docs.push(this.toDocument(idAt(index), record));
     }
     this.mini.addAll(docs);
     this._size = docs.length;
   }
 
   /**
-   * Re-indexes fully from the current state of `store`. This is the
-   * supported way to keep the index in sync after a batch of edits (e.g.
-   * after applyToAll/applyToMatching/deleteMatching) — call rebuild(store)
-   * once after the batch completes, rather than updating per-edit.
+   * Re-indexes fully from the current state of `store`. Use it after a batch
+   * of content edits (e.g. applyToAll/applyToMatching) to make the new
+   * content searchable. Inserts and deletes alone don't require it: search
+   * results already follow the store's current positions.
    */
   rebuild(store: ReadableStore, options: RecordErrorOptions = {}): void {
     this.build(store, options);
   }
 
   /**
-   * Adds or updates a single record's entry in the index without a full
-   * rebuild. This is the seam a future live-sync decorator (wrapping
-   * EditableStore to call add()/remove() around setRecord/insertRecord/
-   * deleteRecord) would use; not called by build()/rebuild() themselves.
-   * Caller is responsible for position stability across such calls.
+   * Adds or updates a single record's entry without a full rebuild, e.g.
+   * after `setRecord` or `insertRecord`. `id` is the record's stable ID from
+   * `store.idAt(position)` (for stores without IDs, its position).
    */
-  add(position: number, record: MarcRecord): void {
-    const doc = this.toDocument(position, record);
-    if (this.mini.has(position)) {
+  add(id: RecordId, record: MarcRecord): void {
+    const doc = this.toDocument(id, record);
+    if (this.mini.has(id)) {
       this.mini.replace(doc);
     } else {
       this.mini.add(doc);
@@ -194,26 +203,38 @@ export class SearchIndex {
     }
   }
 
-  /** Removes a single record's entry from the index. No-op if not present. */
-  remove(position: number): void {
-    if (this.mini.has(position)) {
-      this.mini.discard(position);
+  /**
+   * Removes a single record's entry from the index by stable ID. No-op if not
+   * present. Not needed after deleting a record from an ID-aware store, since
+   * deleted records are already left out of search results.
+   */
+  remove(id: RecordId): void {
+    if (this.mini.has(id)) {
+      this.mini.discard(id);
       this._size--;
     }
   }
 
   /**
-   * Runs a full-text query and returns matching positions ranked by
-   * relevance. Feed `position` back into `store.getRecord(position)` to
-   * retrieve the matching record.
+   * Runs a full-text query and returns matching records ranked by relevance.
+   * Each result has the record's stable `id` and its current `position`
+   * (feed it to `store.getRecord(position)`). Records deleted from the store
+   * since the index was built are left out.
    */
   search(query: string, limit?: number): SearchResultItem[] {
-    const results = this.mini.search(query);
-    const limited = limit !== undefined ? results.slice(0, limit) : results;
-    return limited.map((r) => ({
-      position: r.id as number,
-      score: r.score,
-      match: r.match,
-    }));
+    const store = this.store;
+    const positionOf =
+      store !== null && hasIds(store)
+        ? (id: RecordId) => store.positionOf(id)
+        : (id: RecordId) => id;
+    const items: SearchResultItem[] = [];
+    for (const r of this.mini.search(query)) {
+      if (limit !== undefined && items.length >= limit) break;
+      const id = r.id as RecordId;
+      const position = positionOf(id);
+      if (position === undefined) continue;
+      items.push({ id, position, score: r.score, match: r.match });
+    }
+    return items;
   }
 }

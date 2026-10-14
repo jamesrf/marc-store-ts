@@ -12,6 +12,6 @@ node --experimental-strip-types "$root/examples/generate-sample-data.ts" "$workd
 cd "$workdir"
 for example in "$root"/examples/0*.ts; do
   echo "::group::$(basename "$example")"
-  node --experimental-strip-types "$example" sample-data.mrc output.mrc
+  node --experimental-strip-types "$example" sample-data.mrc
   echo "::endgroup::"
 done
