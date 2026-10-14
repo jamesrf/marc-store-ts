@@ -48,8 +48,24 @@ export class EditLayer implements EditableStore, IdentifiedStore {
     return this._modifiedCount;
   }
 
+  /**
+   * Snapshot of every slot, including deleted ones, in file order.
+   * @deprecated Copies the whole slot array on every access. Use
+   * `getSlot(position)` or `iterateSlots()` instead.
+   */
   get slots(): readonly Readonly<RecordSlot>[] {
     return Object.freeze(this._slots.map((s) => Object.freeze({ ...s })));
+  }
+
+  /** The slot (edit state) of the record at `position`, or undefined if out of range. */
+  getSlot(position: number): Readonly<RecordSlot> | undefined {
+    const slot = this._slotAt(position);
+    return slot === undefined ? undefined : Object.freeze({ ...slot });
+  }
+
+  /** Yields every slot, including deleted ones, in file order. */
+  *iterateSlots(): Generator<Readonly<RecordSlot>> {
+    for (const slot of this._slots) yield Object.freeze({ ...slot });
   }
 
   // ========== Retrieval ==========

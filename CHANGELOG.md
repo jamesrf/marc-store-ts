@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `getSlot(position)` and `iterateSlots()` on `MarcFile` and `EditLayer`.
 - Stable record IDs: `idAt(position)`, `positionOf(id)`, `getRecordById(id)`, `revert(id)` and `deletedIds()` on `MarcFile` and `EditLayer` (`MarcBase` has `idAt`/`positionOf`, where ID equals index), plus the `RecordId` type and `IdentifiedStore` interface. IDs don't change when other records move and are never reused. `revert(id)` can undo a deletion, which `revertRecord(position)` cannot.
 - Every `RecordSlot` now has an `id`.
 - `deleteRecords(positions)` and `insertRecords(records, afterPosition?)` on `MarcFile`, `EditLayer` and the `EditableStore` interface, for single-pass bulk edits.
@@ -19,6 +20,9 @@ All notable changes to this project are documented here. The format is based on
 - `MarcFile.fromBuffer` / `MarcBase.fromBuffer` accept an options object (`cacheCapacity`, `onIssue`, `copyBuffer`) and expose `indexIssues`. A plain cache-capacity number is still accepted.
 - `LICENSE` file (MIT) and full package metadata (`description`, `repository`, `homepage`, `bugs`, `keywords`).
 - `examples/generate-sample-data.ts` and an `npm run examples` script that runs every example in CI.
+
+### Deprecated
+- The `slots` getter, which copies every slot on each access. Use `getSlot` or `iterateSlots`.
 
 ### Changed
 - `SearchIndex` keys documents by stable record ID. `search()` results gain an `id` and report each record's current `position`, leave out records deleted since the build, and stay correct after inserts and deletes without a rebuild. `add()` and `remove()` now take a record ID (for an unedited store, ID and position are the same, so existing calls behave as before).

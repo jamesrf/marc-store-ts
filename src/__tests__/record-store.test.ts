@@ -552,3 +552,12 @@ describe('MarcFile stable record IDs', () => {
     expect(store.deletedIds()).toEqual([]);
   });
 });
+
+describe('MarcFile slot access', () => {
+  it('delegates getSlot and iterateSlots', () => {
+    const store = MarcFile.fromBuffer(createMultiRecordBuffer(2));
+    store.deleteRecord(0);
+    expect(store.getSlot(0)).toMatchObject({ kind: 'original', id: 1 });
+    expect(Array.from(store.iterateSlots()).map((s) => s.kind)).toEqual(['deleted', 'original']);
+  });
+});

@@ -118,7 +118,7 @@ constructor(
 ```typescript
 totalRecords: number                       // Total number of records in the file
 modifiedCount: number                      // Number of edited records
-slots: readonly Readonly<RecordSlot>[]     // Read-only snapshot of all record slots (see RecordSlot)
+slots: readonly Readonly<RecordSlot>[]     // Deprecated: copies every slot on each access; use getSlot/iterateSlots
 base: MarcBase                             // Advanced: underlying buffer and LRU cache layer
 edits: EditLayer                           // Advanced: copy-on-write edit layer
 ```
@@ -338,7 +338,7 @@ for (const id of store.deletedIds()) store.revert(id);
 
 ### RecordSlot
 
-Discriminated union representing the state of each record in the edit layer. Accessible via `store.slots`.
+Discriminated union representing the state of each record in the edit layer. Read one with `store.getSlot(position)` (undefined if out of range), or all of them, including deleted records, in file order with `store.iterateSlots()`. The older `store.slots` getter still works but copies every slot on each access, so avoid it on large files.
 
 ```typescript
 type RecordSlot =

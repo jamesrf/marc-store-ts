@@ -74,8 +74,21 @@ export class MarcFile implements IdentifiedStore {
   get modifiedCount(): number {
     return this._edits.modifiedCount;
   }
+  /**
+   * Snapshot of every slot, including deleted ones, in file order.
+   * @deprecated Copies the whole slot array on every access. Use
+   * `getSlot(position)` or `iterateSlots()` instead.
+   */
   get slots(): readonly Readonly<RecordSlot>[] {
     return this._edits.slots;
+  }
+  /** The slot (edit state) of the record at `position`, or undefined if out of range. */
+  getSlot(position: number): Readonly<RecordSlot> | undefined {
+    return this._edits.getSlot(position);
+  }
+  /** Yields every slot, including deleted ones, in file order. */
+  *iterateSlots(): Generator<Readonly<RecordSlot>> {
+    yield* this._edits.iterateSlots();
   }
 
   getRecord(position: number): MarcRecord {

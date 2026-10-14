@@ -855,3 +855,29 @@ describe('MarcBase IDs', () => {
     expect(() => base.idAt(3)).toThrow(RangeError);
   });
 });
+
+describe('EditLayer slot access', () => {
+  it('getSlot returns the slot at a position, frozen', () => {
+    const layer = makeLayer(3);
+    layer.setRecord(1, createTypicalRecord('mod'));
+    expect(layer.getSlot(1)).toMatchObject({ kind: 'modified', id: 1, index: 1 });
+    expect(layer.getSlot(0)).toEqual({ kind: 'original', id: 0, index: 0 });
+    expect(Object.isFrozen(layer.getSlot(0))).toBe(true);
+    expect(layer.getSlot(3)).toBeUndefined();
+  });
+
+  it('getSlot skips deleted slots, like other position lookups', () => {
+    const layer = makeLayer(3);
+    layer.deleteRecord(0);
+    expect(layer.getSlot(0)).toMatchObject({ kind: 'original', id: 1 });
+  });
+
+  it('iterateSlots yields every slot including deleted ones, matching slots', () => {
+    const layer = makeLayer(3);
+    layer.deleteRecord(0);
+    layer.insertRecord(createTypicalRecord('ins'));
+    const slots = Array.from(layer.iterateSlots());
+    expect(slots.map((s) => s.kind)).toEqual(['deleted', 'original', 'original', 'inserted']);
+    expect(slots).toEqual(layer.slots);
+  });
+});
