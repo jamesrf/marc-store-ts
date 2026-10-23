@@ -5,39 +5,63 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write
+  id-token: write
 
 jobs:
-  checks:
-    uses: ./.github/workflows/checks.yml
-
-  publish:
-    needs: checks
+  ci:
+    name: Node ${{ matrix.node-version }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [24, 26]
 
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run type-check
+
+      - run: npm run lint
+
+      - run: npm run format:check
+
+      - run: npm run test:coverage -- --run
+
+      - run: npm run build
+
+  publish:
+    needs: ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 26
+          cache: npm
           registry-url: https://registry.npmjs.org
 
-      # Publish the exact tarball that passed the checks, rather than rebuilding.
-      - uses: actions/download-artifact@v4
-        with:
-          name: package-tarball
+      - run: npm ci
 
-      - run: npm publish marc-store-ts-*.tgz --provenance --access public
+      - run: npm run build
+
+      - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   github-release:
     needs: publish
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v4
