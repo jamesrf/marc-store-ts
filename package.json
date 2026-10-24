@@ -1,6 +1,6 @@
 {
   "name": "marc-store-ts",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Lazy-parsing, copy-on-write storage and editing for large MARC21 files",
   "keywords": [
     "marc",
@@ -46,7 +46,7 @@
     "lint:fix": "eslint src examples bench --fix",
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\" \"bench/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"examples/**/*.ts\" \"bench/**/*.ts\"",
-    "prepublishOnly": "npm run type-check && npm run lint && npm test && npm run build",
+    "prepublishOnly": "npm run type-check && npm run lint && npm test -- --run && npm run build",
     "examples": "bash scripts/run-examples.sh",
     "bench": "npm run build && node --experimental-strip-types bench/run.ts",
     "docs": "typedoc",
