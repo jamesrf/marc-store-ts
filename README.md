@@ -7,13 +7,27 @@
 
 A TypeScript library designed to handle large MARC bibliographic files (50K-250K records, 70-250MB+) with intelligent caching, lazy parsing, and copy-on-write editing capabilities.
 
+## Why marc-store-ts?
+
+**The whole file is in memory either way — what matters is the form it's in.** As raw bytes, a MARC file is compact: one contiguous byte array, about the size of the file on disk. Parsed into JavaScript objects (a record, an array of fields, subfield objects, a string for every tag, indicator and value), the same data takes several times as much memory, and creates millions of small objects for the garbage collector to trace. On a 100K-record file, parsing every record up front used **7.8× the file size**; a `MarcFile` used **1.4×** and was ready in 19 ms instead of 390 ms (see [Memory Usage](#memory-usage)).
+
+So the store keeps the bytes and parses on demand:
+
+- Records stay as bytes until you ask for one, and only recently used records are kept as objects (an LRU cache, 200 by default), so memory stays close to the file size however large the file is.
+- Edits are stored separately, so changing a few records in a 250K-record file costs memory for those records only.
+- Binary export writes unmodified records straight from the original bytes. That is fast, and it means a load → edit → save cycle doesn't alter records you didn't touch.
+
+**When to use it:** interactive or browser-based work on large files — browsing, searching, random access, and editing some records before saving.
+
+**When you don't need it:** small files (just parse everything), or single-pass "transform every record and write it out" jobs, where a streaming reader is simpler and uses less memory because it never holds the whole file. A full pass through the store costs about the same time as parsing everything; the savings are in memory and startup, not raw throughput on full scans.
+
 ## Features
 
-- **Efficient Storage**: Handle 50K-250K MARC records with minimal memory footprint
-- **Intelligent LRU Caching**: Recently accessed records stay in memory for fast retrieval
-- **Lazy Parsing**: Records are only parsed when accessed, reducing startup time
-- **Copy-on-Write Editing**: Edit records without modifying the original buffer
-- **Zero-Copy Serialization**: Unmodified records are serialized as buffer views (no re-parsing)
+- **Efficient Storage**: Handle 50K-250K MARC records with memory close to the file size, rather than the several-fold cost of parsing every record
+- **Intelligent LRU Caching**: Recently accessed records stay in memory for fast retrieval, while the number of parsed records held at once stays bounded
+- **Lazy Parsing**: Records are only parsed when accessed, so a large file is usable almost immediately (a 100K-record file indexes in ~20 ms)
+- **Copy-on-Write Editing**: Edit records without modifying the original buffer, and without duplicating the records you didn't change
+- **Zero-Copy Serialization**: Unmodified records are serialized as buffer views (no re-parsing), so they're written back exactly as they were read
 - **Type-Safe API**: Uses discriminated unions for safe error handling
 - **Full-Text Search**: Pure-JS `SearchIndex` for querying by title, author, subject, or any custom field combination — works identically in Node and the browser
 
@@ -57,11 +71,11 @@ MarcFile
 
 **Record retrieval**: an edited slot returns its stored record; an original slot is served from the LRU cache, or parsed from the buffer on a miss.
 
-This design ensures:
-- The library never writes to the original buffer
-- Only recently used records consume memory
-- Edits are tracked separately without duplicating unmodified data
-- Serialization can reuse original buffer data for unmodified records
+Why it's built this way:
+- **Records stay as bytes until used**, because parsed records take several times more memory than their bytes and add garbage-collector work. The index needs only an offset and length per record.
+- **The cache is bounded**, so memory doesn't grow as you read through the file. Records you return to often stay fast.
+- **Edits live in a separate layer, and the original buffer is never written to.** Unchanged records cost nothing extra, and reverting an edit just restores the original bytes.
+- **Serialization reuses the original bytes for unmodified records**, which avoids a parse and re-serialize round trip and keeps those records exactly as they were.
 
 ## API Documentation
 
@@ -793,7 +807,7 @@ for (let i = 0; i < store.totalRecords; i++) {
 
 ### Benchmarks
 
-Measured with `npm run bench` on an Apple M2, Node 26, over synthetic records of about 200 bytes each (10K records ≈ 2 MB, 250K ≈ 51 MB). Each operation runs on a fresh store. Your numbers will vary with record size and hardware; run `npm run bench -- 10000,100000` to measure your own.
+Measured with `npm run bench` on an Apple M2, Node 26, over synthetic records of about 200 bytes each (10K records ≈ 2 MB, 250K ≈ 51 MB). Each operation runs on a fresh store. Your numbers will vary with record size and hardware; see [Running the benchmarks](#running-the-benchmarks) to measure your own.
 
 | Operation | 10,000 records | 100,000 records | 250,000 records |
 |---|---:|---:|---:|
@@ -813,9 +827,37 @@ Single inserts and deletes each cost time proportional to the file size, because
 
 ### Memory Usage
 
-- **Index**: ~16 bytes per record (100K records ≈ 1.6MB)
-- **Cache**: Size of cached records only (configurable)
-- **Edits**: Size of modified/inserted records only (sparse)
+Measured with `npm run bench:memory` on a synthetic 100,000-record file (24.5 MB, about 245 bytes per record). "Heap" is JavaScript objects; "Buffers" is the raw file bytes held outside the heap.
+
+| Mode | Time | Heap | Buffers | Total | × file size |
+|---|---:|---:|---:|---:|---:|
+| `parseMarcBinary`, all records (buffer released) | 390 ms | 191.7 MB | 0.0 MB | 191.7 MB | 7.8× |
+| `MarcFile.fromBuffer` | 19 ms | 10.6 MB | 24.5 MB | 35.1 MB | 1.4× |
+| `MarcFile.fromBuffer` + read every record once | 535 ms | 11.2 MB | 24.5 MB | 35.7 MB | 1.5× |
+
+Real catalogue records usually have more fields than these synthetic ones, which tends to widen the gap. Run the script on your own file to check.
+
+What the store holds:
+
+- **Raw buffer**: the file itself, about its size on disk (not copied unless you pass `copyBuffer: true`)
+- **Index and slots**: about 100 bytes per record (100K records ≈ 10 MB)
+- **Cache**: the cached parsed records only (`cacheCapacity`, default 200)
+- **Edits**: modified and inserted records only (sparse)
+
+### Running the benchmarks
+
+Both scripts build the library first and import it from `dist/`.
+
+```bash
+# Timings of store operations over synthetic files (default sizes 10K, 100K, 250K records)
+npm run bench
+npm run bench -- 10000,100000
+
+# Memory and load time: parsing everything up front vs MarcFile.fromBuffer, on your own file
+npm run bench:memory -- path/to/catalog.mrc
+```
+
+`bench:memory` runs each mode in a separate Node process so their heaps don't interfere, and measures memory after a forced garbage collection, relative to a baseline taken before the file is read. To try it without a real file, generate one with `node examples/generate-sample-data.ts sample.mrc 100000`.
 
 ### Optimization Tips
 
@@ -861,6 +903,10 @@ npm run type-check
 
 # Run every example against generated sample data (requires a build)
 npm run build && npm run examples
+
+# Benchmarks (build first)
+npm run bench
+npm run bench:memory -- path/to/catalog.mrc
 ```
 
 ### Scripts
@@ -868,12 +914,13 @@ npm run build && npm run examples
 - `build` - Compile TypeScript to JavaScript (ESM)
 - `test` - Run Vitest (watch mode in a terminal, single run in CI)
 - `test:coverage` - Generate code coverage report
-- `lint` / `lint:fix` - Lint `src/` and `examples/` with ESLint
-- `format` / `format:check` - Format `src/` and `examples/` with Prettier
+- `lint` / `lint:fix` - Lint `src/`, `examples/` and `bench/` with ESLint
+- `format` / `format:check` - Format `src/`, `examples/` and `bench/` with Prettier
 - `type-check` - Type-check the library and the examples without emitting files
 - `examples` - Generate sample data and run every example against it
 - `docs` - Generate the TypeDoc API reference into `docs-api/`
-- `bench` - Build, then run the benchmarks
+- `bench` - Build, then time store operations over synthetic files
+- `bench:memory` - Build, then compare memory and load time of parsing everything vs `MarcFile.fromBuffer` on a given file
 
 ## Requirements
 

@@ -49,7 +49,8 @@
     "prepublishOnly": "npm run type-check && npm run lint && npm test && npm run build",
     "examples": "bash scripts/run-examples.sh",
     "bench": "npm run build && node --experimental-strip-types bench/run.ts",
-    "docs": "typedoc"
+    "docs": "typedoc",
+    "bench:memory": "npm run build && node --experimental-strip-types bench/memory.ts"
   },
   "engines": {
     "node": ">=22"
